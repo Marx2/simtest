@@ -41,7 +41,7 @@ INTERACTION_DISTANCE = 20 # Max distance for interaction (pixels)
 THOUGHT_DURATION = 5.0 # Seconds to display thought bubble
 THOUGHT_COLOR = (240, 240, 240) # Light grey for thought text
 THOUGHT_BG_COLOR = (50, 50, 50, 180) # Semi-transparent dark background
-#SIM_RADIUS = 5 # REMOVED
+SIM_RADIUS = 5 # REMOVED
 
 # Initialize font - needs pygame.init() called first, handle in main
 pygame.font.init() # Ensure font module is initialized
@@ -52,7 +52,9 @@ class Sim:
     def __init__(self, sim_id, x, y, ollama_client: OllamaClient):
         """Initializes a Sim with ID, position, and Ollama client."""
         self.sim_id = sim_id  # Store the unique ID
-        self.sprite = self._load_sprite() # Load character sprite
+        self.sprite_sheet = None
+        self._load_sprite_sheet()
+        self.current_direction = 'front'
         self.first_name = random.choice(FIRST_NAMES)
         self.last_name = random.choice(LAST_NAMES)
         self.full_name = f"{self.first_name} {self.last_name}"
@@ -74,7 +76,7 @@ class Sim:
         self.relationships = {} # Key: other_sim_id, Value: {"friendship": float, "romance": float}
         self.mood = 0.0 # -1.0 (Sad) to 1.0 (Happy)
 
-        # REMOVED DUPLICATE _load_sprite method
+    # REMOVED DUPLICATE _load_sprite method
     def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size): # Add tile_size
         """Updates the Sim's state, following a path if available, and logs data."""
         if not self.path:
@@ -106,6 +108,12 @@ class Sim:
                 # Move
                 self.x += norm_dx * MOVE_SPEED * dt
                 self.y += norm_dy * MOVE_SPEED * dt
+                
+                # Determine the direction of movement
+                if abs(norm_dx) > abs(norm_dy):
+                    self.current_direction = 'right' if norm_dx > 0 else 'left'
+                else:
+                    self.current_direction = 'down' if norm_dy > 0 else 'up'
 
         # Update thought timer
         if self.current_thought:
@@ -171,15 +179,46 @@ class Sim:
              self.target = None
              self.path_index = 0
 
-    def _load_sprite(self):
-        """Loads the Sim's sprite from a predefined path."""
+    def _load_sprite_sheet(self):
+        """Loads the Sim's sprite sheet from a predefined path."""
         try:
             sprite_path = os.path.join(os.path.dirname(__file__), '..', '..', 'static_dirs', 'assets', 'characters', 'original', 'Abigail_Chen.png')
-            self.sprite = pygame.image.load(sprite_path).convert_alpha()
+            self.sprite_sheet = pygame.image.load(sprite_path).convert_alpha()
         except Exception as e:
-            print(f"Error loading sprite: {e}")
-            self.sprite = None
-        return self.sprite
+            print(f"Error loading sprite sheet: {e}")
+            self.sprite_sheet = None
+        return self.sprite_sheet
+
+    def _get_sprite(self, direction):
+        """Returns the appropriate sub-sprite based on the direction."""
+        if not self.sprite_sheet:
+            return None
+        
+        # Define the dimensions of each sub-sprite
+        width = SPRITE_WIDTH
+        height = SPRITE_HEIGHT
+        
+        # Calculate the row and column in the sprite sheet based on direction
+        if direction == 'up':
+            row, col = 0, 1
+        elif direction == 'down':
+            row, col = 2, 1
+        elif direction == 'left':
+            row, col = 1, 0
+        elif direction == 'right':
+            row, col = 1, 2
+        else:
+            row, col = 1, 1  # Default to facing front
+        
+        # Calculate the position of the sub-sprite in the sprite sheet
+        x = col * width
+        y = row * height
+        
+        # Extract the sub-sprite
+        sprite = pygame.Surface((width, height), pygame.SRCALPHA)
+        sprite.blit(self.sprite_sheet, (0, 0), (x, y, width, height))
+        
+        return sprite
 
     def _check_interactions(self, all_sims, logger, current_time): # Add logger and time
         """Checks for and handles interactions with nearby Sims, logging them."""
@@ -230,11 +269,14 @@ class Sim:
         """Draws the Sim and its current thought on the screen."""
         sim_pos = (int(self.x), int(self.y))
 
+        # Get the sprite based on the current direction
+        sprite = self._get_sprite(self.current_direction)
+
         # Draw Sim sprite or fallback circle
-        if self.sprite:
+        if sprite:
             # Center the sprite on the sim's position
-            sprite_rect = self.sprite.get_rect(center=sim_pos)
-            screen.blit(self.sprite, sprite_rect)
+            sprite_rect = sprite.get_rect(center=sim_pos)
+            screen.blit(sprite, sprite_rect)
         else:
             # Fallback: Draw mood-colored circle
             base_color = self.color # Keep original random color base
