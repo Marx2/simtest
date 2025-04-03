@@ -1,14 +1,18 @@
 import pygame
+import os
+import sys
+print(f"Current working directory: {os.getcwd()}")
+print(f"Python sys.path: {sys.path}")
 import sys
 import random
 import uuid
 import json
 import os
-from core.sim import Sim
-from core.weather import Weather
-from core.city import City, TILE_SIZE # Import TILE_SIZE constant
-from ai.ollama_client import OllamaClient
-from core.logger import Logger
+from aisim.src.core.sim import Sim
+from aisim.src.core.weather import Weather
+from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
+from aisim.src.ai.ollama_client import OllamaClient
+from aisim.src.core.logger import Logger
 # Constants (Defaults, will be overridden by config)
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
@@ -35,7 +39,7 @@ def load_config():
 
 
 def main():
-    """Main function to run the simulation."""
+    # Load config first
     # Load config first
     config = load_config()
     sim_config = config['simulation']

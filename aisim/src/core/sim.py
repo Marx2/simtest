@@ -4,8 +4,8 @@ import math
 import uuid
 import textwrap
 import os
-from ai.ollama_client import OllamaClient
-from core.city import TILE_SIZE # Import TILE_SIZE constant
+from aisim.src.ai.ollama_client import OllamaClient
+from aisim.src.core.city import TILE_SIZE # Import TILE_SIZE constant
 # Common first and last names for Sims
 FIRST_NAMES = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer",
               "Michael", "Linda", "William", "Elizabeth", "David", "Barbara",
@@ -36,7 +36,6 @@ def wrap_text(text, font, max_width):
 SIM_COLOR = (255, 255, 255)  # White (fallback)
 SPRITE_WIDTH = 32  # Based on tile size
 SPRITE_HEIGHT = 32
-MOVE_SPEED = 50  # Pixels per second
 INTERACTION_DISTANCE = 20 # Max distance for interaction (pixels)
 THOUGHT_DURATION = 5.0 # Seconds to display thought bubble
 THOUGHT_COLOR = (240, 240, 240) # Light grey for thought text
@@ -60,6 +59,7 @@ class Sim:
         self.full_name = f"{self.first_name} {self.last_name}"
         self.x = x
         self.y = y
+        self.speed = random.uniform(30, 70)  # Random speed for each sim
         self.color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255)) # Fallback color
         # self.sprite = self._load_sprite() # Load character sprite
         self.path = None
@@ -80,6 +80,8 @@ class Sim:
     # REMOVED DUPLICATE _load_sprite method
     def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size): # Add tile_size
         """Updates the Sim's state, following a path if available, and logs data."""
+        if logger:
+            print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}")
         if not self.path:
             self._find_new_path(city)
             if not self.path: # Still no path (e.g., couldn't find one)
@@ -107,8 +109,10 @@ class Sim:
                 norm_dx = dx / distance
                 norm_dy = dy / distance
                 # Move
-                self.x += norm_dx * MOVE_SPEED * dt
-                self.y += norm_dy * MOVE_SPEED * dt
+                if random.random() < 0.01:  # 1% chance to stop
+                    return
+                self.x += norm_dx * self.speed * dt
+                self.y += norm_dy * self.speed * dt
                 
                 # Determine the direction of movement
                 if abs(norm_dx) > abs(norm_dy):
@@ -157,9 +161,22 @@ class Sim:
 
     def _find_new_path(self, city):
         """Finds a path to a new random destination within the city."""
-        # Pick a random destination tile
-        dest_col = random.randint(0, city.grid_width - 1)
-        dest_row = random.randint(0, city.grid_height - 1)
+        # Pick a random destination tile, with a bias against the center
+        center_col = city.grid_width // 2
+        center_row = city.grid_height // 2
+        max_distance = max(center_col, center_row)
+        
+        while True:
+            dest_col = random.randint(0, city.grid_width - 1)
+            dest_row = random.randint(0, city.grid_height - 1)
+            
+            # Calculate distance from the center
+            distance = math.sqrt((dest_col - center_col)**2 + (dest_row - center_row)**2)
+            
+            # Give higher probability to tiles further from the center
+            probability = distance / max_distance
+            if random.random() < probability:
+                break
         self.target = city.get_coords_from_node((dest_col, dest_row))
 
         if self.target:
@@ -223,6 +240,8 @@ class Sim:
 
     def _check_interactions(self, all_sims, logger, current_time):
         """Checks for and handles interactions with nearby Sims, logging them."""
+        if logger:
+            print(f"Sim {self.sim_id} checking interactions")
         for other_sim in all_sims:
             if other_sim.sim_id == self.sim_id:
                 continue # Don't interact with self
@@ -231,6 +250,16 @@ class Sim:
 
             INTERACTION_COOLDOWN = 5.0  # Minimum time between interactions (seconds)
             if dist < INTERACTION_DISTANCE and current_time - self.last_interaction_time >= INTERACTION_COOLDOWN:
+                print(f"Sim {self.sim_id} interacting with Sim {other_sim.sim_id} at distance {dist}")
+                
+                # Stop both sims upon interaction
+                self.path = None
+                self.target = None
+                self.path_index = 0
+                other_sim.path = None
+                other_sim.target = None
+                other_sim.path_index = 0
+                
                 # TODO: Use personality traits to influence interaction chance/outcome
 
                 # Initialize relationship if first meeting
