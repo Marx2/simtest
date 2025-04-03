@@ -155,7 +155,7 @@ class City:
             def heuristic(u, v):
                 pos_u = self.graph.nodes[u]['pos']
                 pos_v = self.graph.nodes[v]['pos']
-                return math.dist(pos_u, pos_v)
+                return abs(pos_u[0] - pos_v[0]) + abs(pos_u[1] - pos_v[1])
 
             path_nodes = nx.astar_path(self.graph, start_node, end_node, heuristic=heuristic, weight='weight')
             # Convert node path back to coordinate path

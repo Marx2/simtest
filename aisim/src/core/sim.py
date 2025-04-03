@@ -190,6 +190,7 @@ class Sim:
             # Give higher probability to tiles further from the center
             probability = distance / max_distance
             if random.random() < probability:
+                print(f"Sim {self.sim_id}: New destination=({dest_col}, {dest_row})")
                 break
         self.target = city.get_coords_from_node((dest_col, dest_row))
 
