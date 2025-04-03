@@ -54,6 +54,8 @@ class Sim:
         self.sprite_sheet = None
         self._load_sprite_sheet()
         self.current_direction = 'front'
+        self.previous_direction = 'front'
+        self.previous_angle = 0.0
         self.first_name = random.choice(FIRST_NAMES)
         self.last_name = random.choice(LAST_NAMES)
         self.full_name = f"{self.first_name} {self.last_name}"
@@ -116,10 +118,21 @@ class Sim:
                 self.y += norm_dy * self.speed * dt
                 
                 # Determine the direction of movement
-                if abs(norm_dx) > abs(norm_dy):
-                    self.current_direction = 'right' if norm_dx > 0 else 'left'
-                else:
-                    self.current_direction = 'down' if norm_dy > 0 else 'up'
+                new_angle = math.atan2(norm_dy, norm_dx)
+
+                angle_difference = abs(new_angle - self.previous_angle)
+                angle_threshold = math.pi / 2  # 90 degrees
+
+                if angle_difference > angle_threshold:
+                    if abs(norm_dx) > abs(norm_dy):
+                        new_direction = 'right' if norm_dx > 0 else 'left'
+                    else:
+                        new_direction = 'down' if norm_dy > 0 else 'up'
+
+                    self.current_direction = new_direction
+                    self.previous_direction = new_direction
+                    self.previous_angle = new_angle
+                print(f"Sim {self.sim_id}: Moving, direction={self.current_direction}")
 
         # Update thought timer
         if self.current_thought:
@@ -155,7 +168,7 @@ class Sim:
         if thought_text:
             self.current_thought = thought_text
             self.thought_timer = THOUGHT_DURATION
-            self.memory.append({"type": "thought", "content": thought_text, "situation": situation_description})
+            self.memory.append({"type": "thought", "situation": situation_description})
             # print(f"Sim thought: {self.current_thought}") # Optional log
         else:
             self.current_thought = None # Ensure it's cleared if generation fails
