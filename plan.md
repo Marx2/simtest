@@ -48,7 +48,9 @@ A single-player 2D life simulation game where AI-driven Sims live autonomously i
             *   **Happiness Trends**
             *   **Social Network Map**
     *   Event Logs: Displays major events & memory-based decisions.
-
+    *   Sim Names: Each Sim has a realistic first and last name.
+    *   Wrapped Thought Bubbles: Thought bubbles wrap text to fit within a reasonable width.
+    *   Buildings: The city map includes visible buildings.
 6.  **Scalability & Performance**
 
     *   Adjustable number of Sims (from small neighborhoods to large-scale cities).
@@ -59,23 +61,23 @@ A single-player 2D life simulation game where AI-driven Sims live autonomously i
 
 7. **Graphics**
 
-    *   Inspired by "generative\_agents" project.
-    *   2D sprites for Sims and environment.
-    *   Simple animations for actions and weather effects.
-    *   Clear visual representation of relationships (e.g., color-coded connections on the social network map).
-    *   Example:
+    *   Visual style based on the provided image and assets in `aisim/static_dirs/`.
+    *   **Sims:**
+        *   Use character sprites from `aisim/static_dirs/assets/characters/profile/` for Sim representation.
+        *   Potentially use base sprites from `aisim/static_dirs/assets/characters/` for animations (walking, etc.).
+    *   **Environment:**
+        *   Use tilesets from `aisim/static_dirs/assets/the_ville/visuals/map_assets/v3/` for the base terrain (grass, paths).
+        *   Use building and prop assets from `aisim/static_dirs/assets/the_ville/visuals/map_assets/` (potentially `v1` or `v2` for interiors/furniture).
+    *   **UI:**
+        *   Implement speech bubbles using images from `aisim/static_dirs/assets/speech_bubble/`.
+        *   Display character names above sprites.
+    *   **Map Structure:**
+        *   Implement a more structured tile map generation to create roads, buildings, and green spaces.
 
-        ```mermaid
-        graph LR
-            A[Sim 1] --> B(Sim 2)
-            A --> C{Sim 3}
-            B --> D([Sim 4])
-            C --> D
-            style A fill:#f9f,stroke:#333,stroke-width:2px
-            style B fill:#ccf,stroke:#333,stroke-width:2px
-            style C fill:#fcc,stroke:#333,stroke-width:2px
-            style D fill:#cff,stroke:#333,stroke-width:2px
-        ```
+
+
+
+
 
 ## Tech Stack
 

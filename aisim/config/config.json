@@ -6,6 +6,7 @@
   },
   "simulation": {
     "initial_sims": 10,
-    "fps": 60
+    "fps": 60,
+    "weather_transition_time": 15.0
   }
 }

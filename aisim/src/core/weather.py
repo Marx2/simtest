@@ -12,18 +12,20 @@ class Weather:
         "Rainy": (100, 100, 100),   # Darker Gray
         "Snowy": (200, 200, 200)   # Light Gray
     }
-    TRANSITION_TIME = 10.0  # Seconds between weather changes
+    # TRANSITION_TIME = 10.0 # Removed, now loaded from config
 
-    def __init__(self):
-        """Initializes the weather system."""
+    def __init__(self, config):
+        """Initializes the weather system using simulation config."""
+        self.config = config
+        self.transition_time = self.config.get('weather_transition_time', 15.0) # Default 15s
         self.current_state = random.choice(self.STATES)
         self.time_since_last_change = 0.0
-        print(f"Initial weather: {self.current_state}") # Log initial state
+        print(f"Initial weather: {self.current_state} (Changes every {self.transition_time}s)")
 
     def update(self, dt):
         """Updates the weather state based on time."""
         self.time_since_last_change += dt
-        if self.time_since_last_change >= self.TRANSITION_TIME:
+        if self.time_since_last_change >= self.transition_time:
             self.time_since_last_change = 0.0
             old_state = self.current_state
             # Avoid immediately switching back to the same state

@@ -2,16 +2,46 @@ import pygame
 import random
 import math
 import uuid
-from ai.ollama_client import OllamaClient # Assuming correct path
+import textwrap
+import os
+from ai.ollama_client import OllamaClient
+from core.city import TILE_SIZE # Import TILE_SIZE constant
+# Common first and last names for Sims
+FIRST_NAMES = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer",
+              "Michael", "Linda", "William", "Elizabeth", "David", "Barbara",
+              "Richard", "Susan", "Joseph", "Jessica", "Thomas", "Sarah"]
 
+LAST_NAMES = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller",
+             "Davis", "Garcia", "Rodriguez", "Wilson", "Martinez", "Anderson",
+             "Taylor", "Thomas", "Hernandez", "Moore", "Martin", "Jackson"]
+
+def wrap_text(text, font, max_width):
+    """Helper function to wrap text to fit within a specified width."""
+    words = text.split(' ')
+    lines = []
+    current_line = []
+    
+    for word in words:
+        test_line = ' '.join(current_line + [word])
+        if font.size(test_line)[0] <= max_width:
+            current_line.append(word)
+        else:
+            lines.append(' '.join(current_line))
+            current_line = [word]
+    
+    if current_line:
+        lines.append(' '.join(current_line))
+    return lines
 # Constants
-SIM_COLOR = (255, 255, 255)  # White
-SIM_RADIUS = 5
+SIM_COLOR = (255, 255, 255)  # White (fallback)
+SPRITE_WIDTH = 32  # Based on tile size
+SPRITE_HEIGHT = 32
 MOVE_SPEED = 50  # Pixels per second
 INTERACTION_DISTANCE = 20 # Max distance for interaction (pixels)
 THOUGHT_DURATION = 5.0 # Seconds to display thought bubble
 THOUGHT_COLOR = (240, 240, 240) # Light grey for thought text
 THOUGHT_BG_COLOR = (50, 50, 50, 180) # Semi-transparent dark background
+#SIM_RADIUS = 5 # REMOVED
 
 # Initialize font - needs pygame.init() called first, handle in main
 pygame.font.init() # Ensure font module is initialized
@@ -22,16 +52,20 @@ class Sim:
     def __init__(self, sim_id, x, y, ollama_client: OllamaClient):
         """Initializes a Sim with ID, position, and Ollama client."""
         self.sim_id = sim_id  # Store the unique ID
+        self.sprite = self._load_sprite() # Load character sprite
+        self.first_name = random.choice(FIRST_NAMES)
+        self.last_name = random.choice(LAST_NAMES)
+        self.full_name = f"{self.first_name} {self.last_name}"
         self.x = x
         self.y = y
-        self.color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255)) # Random color for now
+        self.color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255)) # Fallback color
+        # self.sprite = self._load_sprite() # Load character sprite
         self.path = None
         self.path_index = 0
         self.target = None
         # Basic AI attributes
         self.personality = {
-            "outgoing": random.uniform(0.0, 1.0), # Example trait (0=shy, 1=very outgoing)
-            # TODO: Add more traits (e.g., agreeable, conscientious)
+            "outgoing": random.uniform(0.0, 1.0) # Example trait (0=shy, 1=very outgoing)
         }
         self.memory = [] # List to store significant events or interactions
         self.ollama_client = ollama_client
@@ -40,8 +74,9 @@ class Sim:
         self.relationships = {} # Key: other_sim_id, Value: {"friendship": float, "romance": float}
         self.mood = 0.0 # -1.0 (Sad) to 1.0 (Happy)
 
-    def update(self, dt, city, weather_state, all_sims): # Pass all sims for interaction checks
-        """Updates the Sim's state, following a path if available."""
+        # REMOVED DUPLICATE _load_sprite method
+    def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size): # Add tile_size
+        """Updates the Sim's state, following a path if available, and logs data."""
         if not self.path:
             self._find_new_path(city)
             if not self.path: # Still no path (e.g., couldn't find one)
@@ -54,7 +89,7 @@ class Sim:
             dy = target_y - self.y
             distance = math.sqrt(dx**2 + dy**2)
 
-            if distance < SIM_RADIUS: # Reached waypoint
+            if distance < TILE_SIZE/4: # Reached waypoint (1/4 tile distance)
                 self.path_index += 1
                 if self.path_index >= len(self.path): # Reached final destination
                     self.path = None
@@ -90,10 +125,14 @@ class Sim:
              self.mood = min(1.0, self.mood + 0.003 * dt) # Slowly increase mood in good weather
 
         # --- Interaction Check ---
-        self._check_interactions(all_sims)
+        self._check_interactions(all_sims, logger, current_time)
 
         # Clamp mood
         self.mood = max(-1.0, min(self.mood, 1.0))
+
+        # --- Log Mood ---
+        if logger:
+            logger.log_mood(current_time, self.sim_id, self.mood)
 
     def _generate_thought(self, situation_description):
         """Generates and stores a thought using Ollama."""
@@ -132,8 +171,18 @@ class Sim:
              self.target = None
              self.path_index = 0
 
-    def _check_interactions(self, all_sims):
-        """Checks for and handles interactions with nearby Sims."""
+    def _load_sprite(self):
+        """Loads the Sim's sprite from a predefined path."""
+        try:
+            sprite_path = os.path.join(os.path.dirname(__file__), '..', '..', 'static_dirs', 'assets', 'characters', 'original', 'Abigail_Chen.png')
+            self.sprite = pygame.image.load(sprite_path).convert_alpha()
+        except Exception as e:
+            print(f"Error loading sprite: {e}")
+            self.sprite = None
+        return self.sprite
+
+    def _check_interactions(self, all_sims, logger, current_time): # Add logger and time
+        """Checks for and handles interactions with nearby Sims, logging them."""
         for other_sim in all_sims:
             if other_sim.sim_id == self.sim_id:
                 continue # Don't interact with self
@@ -157,8 +206,8 @@ class Sim:
                 other_sim.relationships[self.sim_id]["friendship"] = min(1.0, other_sim.relationships[self.sim_id]["friendship"] + friendship_increase)
 
                 # Generate thoughts about the interaction
-                situation_self = f"just met Sim {other_sim.sim_id[:4]}..." # Use short ID for prompt
-                situation_other = f"just met Sim {self.sim_id[:4]}..."
+                situation_self = f"just met {other_sim.first_name}..." # Use first name for prompt
+                situation_other = f"just met {self.first_name}..."
                 self._generate_thought(situation_self)
                 # Note: This might trigger thoughts simultaneously, potentially overwriting quickly.
                 # A more robust system might queue thoughts or handle conversations.
@@ -169,6 +218,9 @@ class Sim:
                 self.memory.append(interaction_event)
                 other_sim.memory.append({"type": "interaction", "with_sim_id": self.sim_id, "friendship_change": friendship_increase})
 
+                # Log interaction
+                if logger:
+                    logger.log_interaction(current_time, self.sim_id, other_sim.sim_id, friendship_increase)
                 # Mood boost from positive interaction
                 self.mood = min(1.0, self.mood + 0.05)
                 other_sim.mood = min(1.0, other_sim.mood + 0.05)
@@ -176,45 +228,62 @@ class Sim:
 
     def draw(self, screen):
         """Draws the Sim and its current thought on the screen."""
-        # Draw Sim body - color influenced by mood
-        # Lerp between blue (sad) -> white (neutral) -> yellow (happy)
-        base_color = self.color # Keep original random color base
-        mood_color = (0,0,0)
-        if self.mood < 0: # Sad range (Blue tint)
-            lerp_t = abs(self.mood) # 0 to 1
-            mood_color = (
-                int(base_color[0] * (1 - lerp_t) + 0 * lerp_t), # Less Red
-                int(base_color[1] * (1 - lerp_t) + 0 * lerp_t), # Less Green
-                int(base_color[2] * (1 - lerp_t) + 255 * lerp_t) # More Blue
-            )
-        else: # Happy range (Yellow tint)
-            lerp_t = self.mood # 0 to 1
-            mood_color = (
-                int(base_color[0] * (1 - lerp_t) + 255 * lerp_t), # More Red
-                int(base_color[1] * (1 - lerp_t) + 255 * lerp_t), # More Green
-                int(base_color[2] * (1 - lerp_t) + 0 * lerp_t)   # Less Blue
-            )
-        # Clamp colors
-        mood_color = tuple(max(0, min(c, 255)) for c in mood_color)
-
         sim_pos = (int(self.x), int(self.y))
-        pygame.draw.circle(screen, mood_color, sim_pos, SIM_RADIUS)
+
+        # Draw Sim sprite or fallback circle
+        if self.sprite:
+            # Center the sprite on the sim's position
+            sprite_rect = self.sprite.get_rect(center=sim_pos)
+            screen.blit(self.sprite, sprite_rect)
+        else:
+            # Fallback: Draw mood-colored circle
+            base_color = self.color # Keep original random color base
+            mood_color = (0,0,0)
+            if self.mood < 0: # Sad range (Blue tint)
+                lerp_t = abs(self.mood) # 0 to 1
+                mood_color = (
+                    int(base_color[0] * (1 - lerp_t) + 0 * lerp_t), # Less Red
+                    int(base_color[1] * (1 - lerp_t) + 0 * lerp_t), # Less Green
+                    int(base_color[2] * (1 - lerp_t) + 255 * lerp_t) # More Blue
+                )
+            else: # Happy range (Yellow tint)
+                lerp_t = self.mood # 0 to 1
+                mood_color = (
+                    int(base_color[0] * (1 - lerp_t) + 255 * lerp_t), # More Red
+                    int(base_color[1] * (1 - lerp_t) + 255 * lerp_t), # More Green
+                    int(base_color[2] * (1 - lerp_t) + 0 * lerp_t)   # Less Blue
+                )
+            # Clamp colors
+            mood_color = tuple(max(0, min(c, 255)) for c in mood_color)
+            pygame.draw.circle(screen, mood_color, sim_pos, SIM_RADIUS)
 
         # Draw thought bubble if active
         if self.current_thought:
-            thought_surface = SIM_FONT.render(self.current_thought, True, THOUGHT_COLOR)
-            thought_rect = thought_surface.get_rect()
-
+            MAX_BUBBLE_WIDTH = 200  # Maximum width for thought bubbles
+            wrapped_lines = wrap_text(self.current_thought, SIM_FONT, MAX_BUBBLE_WIDTH - 10)
+            
+            # Calculate total height needed
+            line_height = SIM_FONT.get_linesize()
+            total_height = len(wrapped_lines) * line_height
+            
+            # Find the widest line
+            max_line_width = max(SIM_FONT.size(line)[0] for line in wrapped_lines)
+            
             # Position above the Sim
             bubble_padding = 5
             bubble_rect = pygame.Rect(
-                sim_pos[0] - thought_rect.width / 2 - bubble_padding,
-                sim_pos[1] - SIM_RADIUS - thought_rect.height - bubble_padding * 2,
-                thought_rect.width + bubble_padding * 2,
-                thought_rect.height + bubble_padding * 2
+                sim_pos[0] - max_line_width / 2 - bubble_padding,
+                sim_pos[1] - SPRITE_HEIGHT - total_height - bubble_padding * 2,
+                max_line_width + bubble_padding * 2,
+                total_height + bubble_padding * 2
             )
 
             # Draw background bubble
             pygame.draw.rect(screen, THOUGHT_BG_COLOR, bubble_rect, border_radius=5)
-            # Draw text
-            screen.blit(thought_surface, (bubble_rect.x + bubble_padding, bubble_rect.y + bubble_padding))
+            
+            # Draw each line of text
+            y_offset = bubble_rect.y + bubble_padding
+            for line in wrapped_lines:
+                line_surface = SIM_FONT.render(line, True, THOUGHT_COLOR)
+                screen.blit(line_surface, (bubble_rect.x + bubble_padding, y_offset))
+                y_offset += line_height
