@@ -29,6 +29,7 @@ def load_config():
             config.setdefault('simulation', {})
             config['simulation'].setdefault('initial_sims', 10)
             config['simulation'].setdefault('fps', 60)
+            config['simulation'].setdefault('enable_talking', False)
             return config
     except FileNotFoundError:
         print(f"Warning: Config file not found at {CONFIG_PATH}. Using defaults.")
@@ -62,7 +63,8 @@ def main():
             str(uuid.uuid4()), # Generate unique ID
             random.randint(0, SCREEN_WIDTH),
             random.randint(0, SCREEN_HEIGHT),
-            ollama_client # Pass the client instance
+            ollama_client, # Pass the client instance
+            config['simulation']['enable_talking'] # Enable/disable talking from config
         ) for _ in range(sim_config['initial_sims'])
     ]
     logger = Logger() # Create logger instance

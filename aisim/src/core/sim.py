@@ -48,7 +48,7 @@ SIM_FONT = pygame.font.SysFont(None, 18) # Default system font, size 18
 
 class Sim:
     """Represents a single Sim in the simulation."""
-    def __init__(self, sim_id, x, y, ollama_client: OllamaClient):
+    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, enable_talking: bool = False):
         """Initializes a Sim with ID, position, and Ollama client."""
         self.sim_id = sim_id  # Store the unique ID
         self.sprite_sheet = None
@@ -76,6 +76,7 @@ class Sim:
         self.relationships = {} # Key: other_sim_id, Value: {"friendship": float, "romance": float}
         self.mood = 0.0 # -1.0 (Sad) to 1.0 (Happy)
         self.last_interaction_time = 0.0 # Time of last interaction
+        self.enable_talking = False
 
     # REMOVED DUPLICATE _load_sprite method
     def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size): # Add tile_size
@@ -274,13 +275,13 @@ class Sim:
                 other_sim.relationships[self.sim_id]["friendship"] = min(1.0, other_sim.relationships[self.sim_id]["friendship"] + friendship_increase)
 
                 # Generate thoughts about the interaction
-                situation_self = f"just met {other_sim.first_name}..." # Use first name for prompt
-                situation_other = f"just met {self.first_name}..."
-                self._generate_thought(situation_self)
-                # Note: This might trigger thoughts simultaneously, potentially overwriting quickly.
-                # A more robust system might queue thoughts or handle conversations.
-                other_sim._generate_thought(situation_other)
-
+                if self.enable_talking:
+                    situation_self = f"just met {other_sim.first_name}..." # Use first name for prompt
+                    situation_other = f"just met {self.first_name}..."
+                    self._generate_thought(situation_self)
+                    # Note: This might trigger thoughts simultaneously, potentially overwriting quickly.
+                    # A more robust system might queue thoughts or handle conversations.
+                    other_sim._generate_thought(situation_other)
                 # Store interaction in memory
                 interaction_event = {"type": "interaction", "with_sim_id": other_sim.sim_id, "friendship_change": friendship_increase}
                 self.memory.append(interaction_event)
