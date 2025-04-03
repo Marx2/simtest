@@ -4,9 +4,11 @@ import math
 import random
 import os
 
+from aisim.src.core.movement import get_tile_coords, get_node_from_coords, get_coords_from_node, get_path
+from aisim.src.core.constants import TILE_SIZE
+
 # Constants
 GRID_COLOR = (40, 40, 40)  # Dark grey for fallback
-TILE_SIZE = 32 # Assuming 32x32 tiles from assets
 TILESET_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'static_dirs', 'assets', 'the_ville', 'visuals', 'map_assets', 'v3')
 
 class City:
@@ -123,50 +125,7 @@ class City:
                     G.add_edge(node_id, neighbor_id, weight=1)
         return G
 
-    def get_tile_coords(self, x, y):
-        """Converts pixel coordinates to grid tile coordinates (col, row)."""
-        col = int(x // TILE_SIZE)
-        row = int(y // TILE_SIZE)
-        # Clamp to grid bounds
-        col = max(0, min(col, self.grid_width - 1))
-        row = max(0, min(row, self.grid_height - 1))
-        return col, row
 
-    def get_node_from_coords(self, x, y):
-        """Finds the graph node closest to the given pixel coordinates."""
-        return self.get_tile_coords(x, y) # Node ID is the tile coord tuple
-
-    def get_coords_from_node(self, node):
-        """Gets the center pixel coordinates of a given graph node."""
-        if node in self.graph.nodes:
-            return self.graph.nodes[node]['pos']
-        return None # Should not happen if node is valid
-
-    def get_path(self, start_coords, end_coords):
-        """Calculates the shortest path using A*."""
-        start_node = self.get_node_from_coords(start_coords[0], start_coords[1])
-        end_node = self.get_node_from_coords(end_coords[0], end_coords[1])
-
-        if start_node == end_node:
-            return None # Already at destination
-
-        try:
-            # A* heuristic: Euclidean distance
-            def heuristic(u, v):
-                pos_u = self.graph.nodes[u]['pos']
-                pos_v = self.graph.nodes[v]['pos']
-                return abs(pos_u[0] - pos_v[0]) + abs(pos_u[1] - pos_v[1])
-
-            path_nodes = nx.astar_path(self.graph, start_node, end_node, heuristic=heuristic, weight='weight')
-            # Convert node path back to coordinate path
-            path_coords = [self.get_coords_from_node(node) for node in path_nodes]
-            return path_coords
-        except nx.NetworkXNoPath:
-            print(f"No path found between {start_node} and {end_node}")
-            return None
-        except nx.NodeNotFound:
-             print(f"Node not found for path calculation: start={start_node}, end={end_node}")
-             return None
     def draw(self, screen):
         """Draws the city using the generated tile map."""
         if not hasattr(self, 'tile_map') or not self.tile_map or not self.tile_images:
