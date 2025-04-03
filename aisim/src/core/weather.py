@@ -24,6 +24,10 @@ class Weather:
 
     def update(self, dt):
         """Updates the weather state based on time."""
+        enable_weather_changes = self.config.get('weather', {}).get('enable_weather_changes', False)
+        if not enable_weather_changes:
+            return
+
         self.time_since_last_change += dt
         if self.time_since_last_change >= self.transition_time:
             self.time_since_last_change = 0.0
@@ -31,7 +35,7 @@ class Weather:
             # Avoid immediately switching back to the same state
             possible_new_states = [s for s in self.STATES if s != old_state]
             self.current_state = random.choice(possible_new_states)
-            print(f"Weather changed from {old_state} to {self.current_state}") # Log change
+            print(f"Weather changed from {old_state} to {self.current_state}")  # Log change
 
     def get_current_color(self):
         """Returns the background color for the current weather."""

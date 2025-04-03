@@ -1,12 +1,15 @@
 {
   "ollama": {
     "host": "http://localhost:11434",
-    "model": "phi:2.7b",
+    "model": "phi4",
     "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble."
   },
   "simulation": {
     "initial_sims": 10,
     "fps": 60,
     "weather_transition_time": 15.0
+  },
+  "weather": {
+    "enable_weather_changes": false
   }
 }

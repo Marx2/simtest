@@ -75,6 +75,7 @@ class Sim:
         self.thought_timer = 0.0
         self.relationships = {} # Key: other_sim_id, Value: {"friendship": float, "romance": float}
         self.mood = 0.0 # -1.0 (Sad) to 1.0 (Happy)
+        self.last_interaction_time = 0.0 # Time of last interaction
 
     # REMOVED DUPLICATE _load_sprite method
     def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size): # Add tile_size
@@ -220,7 +221,7 @@ class Sim:
         
         return sprite
 
-    def _check_interactions(self, all_sims, logger, current_time): # Add logger and time
+    def _check_interactions(self, all_sims, logger, current_time):
         """Checks for and handles interactions with nearby Sims, logging them."""
         for other_sim in all_sims:
             if other_sim.sim_id == self.sim_id:
@@ -228,10 +229,9 @@ class Sim:
 
             dist = math.dist((self.x, self.y), (other_sim.x, other_sim.y))
 
-            if dist < INTERACTION_DISTANCE:
-                # TODO: Add cooldown to prevent constant interaction spam
+            INTERACTION_COOLDOWN = 5.0  # Minimum time between interactions (seconds)
+            if dist < INTERACTION_DISTANCE and current_time - self.last_interaction_time >= INTERACTION_COOLDOWN:
                 # TODO: Use personality traits to influence interaction chance/outcome
-                # TODO: Add cooldown to prevent constant interaction spam
 
                 # Initialize relationship if first meeting
                 if other_sim.sim_id not in self.relationships:
@@ -263,6 +263,10 @@ class Sim:
                 # Mood boost from positive interaction
                 self.mood = min(1.0, self.mood + 0.05)
                 other_sim.mood = min(1.0, other_sim.mood + 0.05)
+
+                # Update last interaction time
+                self.last_interaction_time = current_time
+                other_sim.last_interaction_time = current_time
 
 
     def draw(self, screen):
