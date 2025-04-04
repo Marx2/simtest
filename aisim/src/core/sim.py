@@ -195,9 +195,8 @@ class Sim:
             row = 2
         elif self.current_direction == 'up':
             row = 3
-        else: # Default/idle (e.g., 'front') - use 'down' row, middle frame
+        else: # Default/idle (e.g., 'front') - use 'down' row
             row = 0
-            self.animation_frame = 1 # Use middle frame when idle/front
 
         # Use the current animation frame for the column
         col = self.animation_frame

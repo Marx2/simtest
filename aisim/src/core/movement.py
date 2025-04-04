@@ -119,17 +119,19 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
             angle_threshold = math.pi / 2  # 90 degrees
             sim.time_since_last_direction_change += dt
             # Check if enough time has passed since the last direction change
-            if sim.time_since_last_direction_change > direction_change_frequency:
-                if angle_difference > angle_threshold:
-                    if abs(norm_dx) > abs(norm_dy):
-                        new_direction = 'right' if norm_dx > 0 else 'left'
-                    else:
-                        new_direction = 'down' if norm_dy > 0 else 'up'
+            #if sim.time_since_last_direction_change > direction_change_frequency:
+            #    if angle_difference > angle_threshold:
+            if abs(norm_dx) > abs(norm_dy):
+                new_direction = 'right' if norm_dx > 0 else 'left'
+            else:
+                new_direction = 'down' if norm_dy > 0 else 'up'
 
-                    sim.current_direction = new_direction
-                    sim.previous_direction = new_direction
-                    sim.previous_angle = new_angle
-                    sim.time_since_last_direction_change = 0.0  # Reset the timer
+            if sim.current_direction != new_direction:
+                sim.current_direction = new_direction
+                sim.previous_direction = new_direction
+                sim.previous_angle = new_angle
+                sim.time_since_last_direction_change = 0.0  # Reset the timer
+                sim.animation_frame = 0 # Reset animation frame
                     # print(f"Sim {sim.sim_id}: Direction changed to {sim.current_direction}")
             # Increment the timer
             # print(f"Sim {sim.sim_id}: Moving, direction={sim.current_direction}")
