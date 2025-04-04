@@ -3,8 +3,7 @@ import networkx as nx
 import math
 import random
 from aisim.src.core.constants import TILE_SIZE
-
-# from aisim.src.core.sim import _find_new_path
+from aisim.src.core.sim import check_interactions
 
 def get_tile_coords(x, y, grid_width, grid_height):
     """Converts pixel coordinates to grid tile coordinates (col, row)."""
@@ -79,7 +78,6 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
     sim.y = max(0, min(sim.y, city.height - 1))
 
     if not sim.path:
-        # from aisim.src.core.sim import get_path, get_node_from_coords, get_coords_from_node
         sim.path = get_path((sim.x, sim.y), (random.randint(0, city.width), random.randint(0, city.height)), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
         # print(f"Sim {sim.sim_id}: New path assigned in movement_update: {sim.path}") # Log path assignment
         if not sim.path:  # Still no path (e.g., couldn't find one)
@@ -153,7 +151,6 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
          sim.mood = min(1.0, sim.mood + 0.003 * dt) # Slowly increase mood in good weather
 
     # --- Interaction Check ---
-    from aisim.src.core.sim import check_interactions
     check_interactions(sim, all_sims, logger, current_time)
     # Clamp mood
     sim.mood = max(-1.0, min(sim.mood, 1.0))
