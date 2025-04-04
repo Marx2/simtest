@@ -47,26 +47,27 @@ def main():
     fps = sim_config['fps']
 
     pygame.init() # Pygame init needs to happen before font loading in Sim
+    # Create AI Client
+    ollama_client = OllamaClient() # Reads its own config section
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption(WINDOW_TITLE)
     clock = pygame.time.Clock()
     ui_font = pygame.font.SysFont(None, 24) # Font for UI text
     log_font = pygame.font.SysFont(None, 18) # Smaller font for event log
-    # Create AI Client
-    ollama_client = OllamaClient() # Reads its own config section
-
     # Create Simulation Components
     weather = Weather(sim_config) # Pass simulation config
     city = City(SCREEN_WIDTH, SCREEN_HEIGHT)
+    enable_talking = config['simulation']['enable_talking']
     sims = [
         Sim(
             str(uuid.uuid4()), # Generate unique ID
             random.randint(0, SCREEN_WIDTH),
             random.randint(0, SCREEN_HEIGHT),
             ollama_client, # Pass the client instance
-            config['simulation']['enable_talking'] # Enable/disable talking from config
+            enable_talking # Enable/disable talking from config
         ) for _ in range(sim_config['initial_sims'])
     ]
+    # Allow sims to talk after display is initialized
     logger = Logger() # Create logger instance
 
     running = True
@@ -76,6 +77,7 @@ def main():
 
     current_sim_time = 0.0 # Track total simulation time passed
     selected_sim = None # Track the currently selected Sim
+
 
     while running:
         # Event handling
@@ -152,19 +154,24 @@ def main():
             id_surface = log_font.render(id_text, True, (255, 255, 255))
             screen.blit(id_surface, (log_x, log_y - (len(selected_sim.memory[-5:]) + 1) * 15 )) # Position above logs
 
-            # Display last 5 memory entries
+        # Display last 5 memory entries
+        if selected_sim and selected_sim.memory:
             for entry in selected_sim.memory[-5:]: # Get last 5 entries
                 entry_text = ""
-                if entry['type'] == 'thought':
+            entry_text = ""
+            if entry['type'] == 'thought':
                     entry_text = f"[Thought] {entry['content'][:60]}..." # Truncate long thoughts
-                elif entry['type'] == 'interaction':
+            elif entry['type'] == 'interaction':
                     entry_text = f"[Interact] w/ {entry['with_sim_id'][:6]} (F_chg: {entry['friendship_change']:.2f})"
 
-                log_surface = log_font.render(entry_text, True, (200, 200, 200))
-                screen.blit(log_surface, (log_x, log_y))
-                log_y -= 15 # Move up for next line
-
+            log_surface = log_font.render(entry_text, True, (200, 200, 200))
+            screen.blit(log_surface, (log_x, log_y))
+            log_y -= 15 # Move up for next line
         pygame.display.flip()  # Update the full display Surface to the screen
+        for sim in sims:
+            sim.can_talk = True
+
+
 
     # --- End of main loop ---
     logger.close() # Close log files cleanly

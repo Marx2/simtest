@@ -49,7 +49,7 @@ SIM_FONT = pygame.font.SysFont(None, 18) # Default system font, size 18
 
 class Sim:
     """Represents a single Sim in the simulation."""
-    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, enable_talking: bool = False):
+    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, enable_talking: bool):
         """Initializes a Sim with ID, position, and Ollama client."""
         self.sim_id = sim_id  # Store the unique ID
         self.sprite_sheet = None
@@ -79,7 +79,8 @@ class Sim:
         self.relationships = {} # Key: other_sim_id, Value: {"friendship": float, "romance": float}
         self.mood = 0.0 # -1.0 (Sad) to 1.0 (Happy)
         self.last_interaction_time = 0.0 # Time of last interaction
-        self.enable_talking = False
+        self.enable_talking = enable_talking
+        self.can_talk = False # Flag to control thought generation
 
     # REMOVED DUPLICATE _load_sprite method
     def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size): # Add tile_size
@@ -106,7 +107,8 @@ class Sim:
                     self.path_index = 0
                     # Generate thought upon arrival
                     situation = f"arrived at location ({int(self.x)}, {int(self.y)}) on a {weather_state} day"
-                    self._generate_thought(situation)
+                    if self.enable_talking and self.can_talk:                    
+                        self._generate_thought(situation)
                     self.mood = min(1.0, self.mood + 0.1) # Mood boost for reaching destination
             else: # Move towards waypoint
                 # Normalize direction vector
@@ -165,14 +167,13 @@ class Sim:
     def _generate_thought(self, situation_description):
         """Generates and stores a thought using Ollama."""
         # print(f"Sim generating thought for: {situation_description}") # Optional log
+        print(f"Sim {self.sim_id}: Attempting to generate thought, enable_talking={self.enable_talking}, can_talk={self.can_talk}")
         thought_text = self.ollama_client.generate_thought(situation_description)
         if thought_text:
             self.current_thought = thought_text
             self.thought_timer = THOUGHT_DURATION
-            self.memory.append({"type": "thought", "situation": situation_description})
-            # print(f"Sim thought: {self.current_thought}") # Optional log
         else:
-            self.current_thought = None # Ensure it's cleared if generation fails
+            print(f"Sim {self.sim_id} failed to generate thought for: {situation_description}")
 
     def _find_new_path(self, city):
         """Finds a path to a new random destination within the city."""
@@ -258,7 +259,7 @@ class Sim:
     def _check_interactions(self, all_sims, logger, current_time):
         """Checks for and handles interactions with nearby Sims, logging them."""
         if logger:
-            print(f"Sim {self.sim_id} checking interactions")
+            print(f"Sim {self.sim_id} checking interactions, enable_talking={self.enable_talking}")
         for other_sim in all_sims:
             if other_sim.sim_id == self.sim_id:
                 continue # Don't interact with self
@@ -266,53 +267,57 @@ class Sim:
             dist = math.dist((self.x, self.y), (other_sim.x, other_sim.y))
 
             INTERACTION_COOLDOWN = 5.0  # Minimum time between interactions (seconds)
+            if dist >= INTERACTION_DISTANCE:
+                print(f"Sim {self.sim_id} too far from Sim {other_sim.sim_id} (distance={dist})")
             if dist < INTERACTION_DISTANCE and current_time - self.last_interaction_time >= INTERACTION_COOLDOWN:
                 print(f"Sim {self.sim_id} interacting with Sim {other_sim.sim_id} at distance {dist}")
+            elif current_time - self.last_interaction_time < INTERACTION_COOLDOWN:
+                print(f"Sim {self.sim_id} on interaction cooldown with Sim {other_sim.sim_id}")
                 
-                # Stop both sims upon interaction
-                self.path = None
-                self.target = None
-                self.path_index = 0
-                other_sim.path = None
-                other_sim.target = None
-                other_sim.path_index = 0
-                
-                # TODO: Use personality traits to influence interaction chance/outcome
+            # Stop both sims upon interaction
+            self.path = None
+            self.target = None
+            self.path_index = 0
+            other_sim.path = None
+            other_sim.target = None
+            other_sim.path_index = 0
+            
+            # TODO: Use personality traits to influence interaction chance/outcome
 
-                # Initialize relationship if first meeting
-                if other_sim.sim_id not in self.relationships:
-                    self.relationships[other_sim.sim_id] = {"friendship": 0.0, "romance": 0.0}
-                if self.sim_id not in other_sim.relationships:
-                    other_sim.relationships[self.sim_id] = {"friendship": 0.0, "romance": 0.0}
+            # Initialize relationship if first meeting
+            if other_sim.sim_id not in self.relationships:
+                self.relationships[other_sim.sim_id] = {"friendship": 0.0, "romance": 0.0}
+            if self.sim_id not in other_sim.relationships:
+                other_sim.relationships[self.sim_id] = {"friendship": 0.0, "romance": 0.0}
 
-                # Basic interaction effect: slightly increase friendship
-                friendship_increase = 0.01 # Placeholder
-                self.relationships[other_sim.sim_id]["friendship"] = min(1.0, self.relationships[other_sim.sim_id]["friendship"] + friendship_increase)
-                other_sim.relationships[self.sim_id]["friendship"] = min(1.0, other_sim.relationships[self.sim_id]["friendship"] + friendship_increase)
+            # Basic interaction effect: slightly increase friendship
+            friendship_increase = 0.01 # Placeholder
+            self.relationships[other_sim.sim_id]["friendship"] = min(1.0, self.relationships[other_sim.sim_id]["friendship"] + friendship_increase)
+            other_sim.relationships[self.sim_id]["friendship"] = min(1.0, other_sim.relationships[self.sim_id]["friendship"] + friendship_increase)
 
-                # Generate thoughts about the interaction
-                if self.enable_talking:
-                    situation_self = f"just met {other_sim.first_name}..." # Use first name for prompt
-                    situation_other = f"just met {self.first_name}..."
-                    self._generate_thought(situation_self)
-                    # Note: This might trigger thoughts simultaneously, potentially overwriting quickly.
-                    # A more robust system might queue thoughts or handle conversations.
-                    other_sim._generate_thought(situation_other)
-                # Store interaction in memory
-                interaction_event = {"type": "interaction", "with_sim_id": other_sim.sim_id, "friendship_change": friendship_increase}
-                self.memory.append(interaction_event)
-                other_sim.memory.append({"type": "interaction", "with_sim_id": self.sim_id, "friendship_change": friendship_increase})
+            # Generate thoughts about the interaction
+            if self.enable_talking and self.can_talk:
+                situation_self = f"just met {other_sim.first_name}..." # Use first name for prompt
+                situation_other = f"just met {self.first_name}..."
+                self._generate_thought(situation_self)
+                # Note: This might trigger thoughts simultaneously, potentially overwriting quickly.
+                # A more robust system might queue thoughts or handle conversations.
+                other_sim._generate_thought(situation_other)
+            # Store interaction in memory
+            interaction_event = {"type": "interaction", "with_sim_id": other_sim.sim_id, "friendship_change": friendship_increase}
+            self.memory.append(interaction_event)
+            other_sim.memory.append({"type": "interaction", "with_sim_id": self.sim_id, "friendship_change": friendship_increase})
 
-                # Log interaction
-                if logger:
-                    logger.log_interaction(current_time, self.sim_id, other_sim.sim_id, friendship_increase)
-                # Mood boost from positive interaction
-                self.mood = min(1.0, self.mood + 0.05)
-                other_sim.mood = min(1.0, other_sim.mood + 0.05)
+            # Log interaction
+            if logger:
+                logger.log_interaction(current_time, self.sim_id, other_sim.sim_id, friendship_increase)
+            # Mood boost from positive interaction
+            self.mood = min(1.0, self.mood + 0.05)
+            other_sim.mood = min(1.0, other_sim.mood + 0.05)
 
-                # Update last interaction time
-                self.last_interaction_time = current_time
-                other_sim.last_interaction_time = current_time
+            # Update last interaction time
+            self.last_interaction_time = current_time
+            other_sim.last_interaction_time = current_time
 
 
     def draw(self, screen):
