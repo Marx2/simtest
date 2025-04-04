@@ -105,9 +105,14 @@ class Sim:
     # REMOVED DUPLICATE _load_sprite method
     def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency): # Add tile_size
         """Updates the Sim's state, following a path if available, and logs data."""
+        self.tile_size = tile_size
+        self.is_blocked = False # Reset blocked status
         # print(f"Sim {self.sim_id}: update called at start, x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}, path={self.path}")
         # Call the movement update method
         movement_update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency)
+        self.check_collision(all_sims)
+        if self.is_blocked:
+            self.handle_blocked(dt, city, direction_change_frequency)
         self.update_animation(dt) # Update animation frame
         if hasattr(self, 'last_update_time') and self.last_update_time == current_time:
             return
@@ -153,6 +158,71 @@ class Sim:
         # --- Log Mood ---
         if logger:
             logger.log_mood(current_time, self.sim_id, self.mood)
+
+    def check_collision(self, all_sims):
+        """Checks for collision with other sims."""
+        for other_sim in all_sims:
+            if other_sim is not self:
+                distance = math.sqrt((self.x - other_sim.x) ** 2 + (self.y - other_sim.y) ** 2)
+                if distance < 30:  # Increased collision distance
+                    self.is_blocked = True
+                    break
+
+    def handle_blocked(self, dt, city, direction_change_frequency):
+        """Handles the Sim when it's blocked."""
+        self.block_timer = getattr(self, 'block_timer', 0.0) + dt
+        block_duration = 1.0  # Duration to stop in seconds
+        if self.block_timer < block_duration:
+            return  # Stay blocked
+
+        self.block_timer = 0.0  # Reset timer
+        self.change_direction(city, direction_change_frequency)
+
+    def change_direction(self, city, direction_change_frequency):
+        """Changes the Sim's direction."""
+        # Stop following the current path
+        self.path = None
+        self.target = None
+
+        # Get available directions
+        available_directions = self.get_available_directions(city)
+
+        if available_directions:
+            # Choose a random direction
+            # Add randomness to direction choice
+            if random.random() < 0.7:
+                new_direction = random.choice(available_directions)
+            else:
+                new_direction = random.choice(available_directions) # Choose again
+            # Update the Sim's path
+            self.path = get_path((self.x, self.y), new_direction, city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
+            if self.path:
+                self.path_index = 0
+                self.target = self.path[self.path_index]
+                print(f"Sim {self.sim_id}: Changed direction to {new_direction}")
+            else:
+                print(f"Sim {self.sim_id}: No path found in new direction {new_direction}")
+        else:
+            print(f"Sim {self.sim_id}: No available directions")
+
+    def get_available_directions(self, city):
+        """Gets available directions for the Sim to move in."""
+        directions = []
+        current_node = get_node_from_coords(self.x, self.y, city.width, city.height)
+        if current_node:
+            neighbors = list(city.graph.neighbors(current_node))
+            for neighbor in neighbors:
+                neighbor_coords = get_coords_from_node(neighbor, city.graph)
+                if neighbor_coords:
+                    # Check if any sim is interacting at the neighbor coords
+                    is_interacting = False
+                    for other_sim in city.sims:
+                        if other_sim.is_interacting and math.dist((other_sim.x, other_sim.y), neighbor_coords) < 10:
+                            is_interacting = True
+                            break
+                    if not is_interacting:
+                        directions.append(neighbor_coords)
+        return directions
 
     def _generate_thought(self, situation_description):
         """Generates and stores a thought using Ollama."""
@@ -235,8 +305,6 @@ class Sim:
        except Exception as e:
            print(f"Error loading sprite sheet: {e}")
            return None, None
-
-
     def draw(self, screen):
         """Draws the Sim and its current thought on the screen."""
         sim_pos = (int(self.x), int(self.y))

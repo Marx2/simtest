@@ -41,7 +41,20 @@ def check_interactions(self, all_sims, logger, current_time):
             # Update last interaction time
             self.last_interaction_time = current_time
             other_sim.last_interaction_time = current_time
-            
+
+            # Prevent overlapping after interaction
+            distance = math.sqrt((self.x - other_sim.x) ** 2 + (self.y - other_sim.y) ** 2)
+            if distance < 20:
+                # Move sims away from each other
+                dx = self.x - other_sim.x
+                dy = self.y - other_sim.y
+                norm_dx = dx / distance
+                norm_dy = dy / distance
+                self.x += norm_dx * (20 - distance) / 2
+                self.y += norm_dy * (20 - distance) / 2
+                other_sim.x -= norm_dx * (20 - distance) / 2
+                other_sim.y -= norm_dy * (20 - distance) / 2
+
         # TODO: Use personality traits to influence interaction chance/outcome
 
         # Initialize relationship if first meeting

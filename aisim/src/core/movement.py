@@ -109,8 +109,9 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
             # Move
             if random.random() < 0.01:  # Reduced chance to stop
                 return
-            sim.x += norm_dx * sim.speed * dt
-            sim.y += norm_dy * sim.speed * dt
+            if not sim.is_blocked:
+                sim.x += norm_dx * sim.speed * dt
+                sim.y += norm_dy * sim.speed * dt
 
             # Determine the direction of movement
             new_angle = math.atan2(norm_dy, norm_dx)
