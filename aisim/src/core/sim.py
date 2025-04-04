@@ -197,7 +197,7 @@ class Sim:
     def _load_sprite_sheet(self):
         """Loads the Sim's sprite sheet from a predefined path."""
         try:
-            sprite_path = os.path.join(os.path.dirname(__file__), '..', '..', 'static_dirs', 'assets', 'characters', 'original', 'Abigail_Chen.png')
+            sprite_path = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'graphics', 'characters', 'Abigail_Chen.png')
             self.sprite_sheet = pygame.image.load(sprite_path).convert_alpha()
         except Exception as e:
             print(f"Error loading sprite sheet: {e}")

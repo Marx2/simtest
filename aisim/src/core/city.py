@@ -9,7 +9,7 @@ from aisim.src.core.constants import TILE_SIZE
 
 # Constants
 GRID_COLOR = (40, 40, 40)  # Dark grey for fallback
-TILESET_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'static_dirs', 'assets', 'the_ville', 'visuals', 'map_assets', 'v3')
+TILESET_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'graphics', 'v3')
 
 class City:
     """Represents the city environment."""
