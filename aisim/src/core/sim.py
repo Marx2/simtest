@@ -7,7 +7,7 @@ import os
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import check_interactions
 from aisim.src.core.city import TILE_SIZE  # Import TILE_SIZE constant
-from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords
+from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, change_direction
 from aisim.src.core.movement import update as movement_update
 
 import os
@@ -176,55 +176,8 @@ class Sim:
             return  # Stay blocked
 
         self.block_timer = 0.0  # Reset timer
-        self.change_direction(city, direction_change_frequency)
-
-    def change_direction(self, city, direction_change_frequency):
-        """Changes the Sim's direction."""
-        # Stop following the current path
-        self.path = None
-        self.target = None
-
-        # Get available directions
-        available_directions = self.get_available_directions(city)
-
-        if available_directions:
-            # Choose a random direction
-            # Add randomness to direction choice
-            if random.random() < 0.7:
-                new_direction = random.choice(available_directions)
-            else:
-                new_direction = random.choice(available_directions) # Choose again
-            # Update the Sim's path
-            self.path = get_path((self.x, self.y), new_direction, city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
-            if self.path:
-                self.path_index = 0
-                self.target = self.path[self.path_index]
-                print(f"Sim {self.sim_id}: Changed direction to {new_direction}")
-            else:
-                print(f"Sim {self.sim_id}: No path found in new direction {new_direction}")
-        else:
-            print(f"Sim {self.sim_id}: No available directions")
-
-    def get_available_directions(self, city):
-        """Gets available directions for the Sim to move in."""
-        directions = []
-        print(f"City object: {city}")
-        print(f"City object attributes: {city.__dict__}")
-        current_node = get_node_from_coords(self.x, self.y, city.width, city.height)
-        if current_node:
-            neighbors = list(city.graph.neighbors(current_node))
-            for neighbor in neighbors:
-                neighbor_coords = get_coords_from_node(neighbor, city.graph)
-                if neighbor_coords:
-                    # Check if any sim is interacting at the neighbor coords
-                    is_interacting = False
-                    for other_sim in city.sims:
-                        if other_sim.is_interacting and math.dist((other_sim.x, other_sim.y), neighbor_coords) < 10:
-                            is_interacting = True
-                            break
-                    if not is_interacting:
-                        directions.append(neighbor_coords)
-        return directions
+        print(f"direction_change_frequency: {direction_change_frequency}")
+        change_direction(self, city, direction_change_frequency)
 
     def _generate_thought(self, situation_description):
         """Generates and stores a thought using Ollama."""

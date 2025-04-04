@@ -162,3 +162,50 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
     # --- Log Mood ---
     if logger:
         logger.log_mood(current_time, sim.sim_id, sim.mood)
+
+    
+def change_direction(sim, city, direction_change_frequency):
+    """Changes the Sim's direction."""
+    # Stop following the current path
+    sim.path = None
+    sim.target = None
+
+    # Get available directions
+    available_directions = get_available_directions(sim, city)
+
+    if available_directions:
+        # Choose a random direction
+        # Add randomness to direction choice
+        if random.random() < 0.7:
+            new_direction = random.choice(available_directions)
+        else:
+            new_direction = random.choice(available_directions)  # Choose again
+        # Update the Sim's path
+        sim.path = get_path((sim.x, sim.y), new_direction, city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
+        if sim.path:
+            sim.path_index = 0
+            sim.target = sim.path[sim.path_index]
+            print(f"Sim {sim.sim_id}: Changed direction to {new_direction}")
+    else:
+        print(f"Sim {sim.sim_id}: No path found in new direction {new_direction}")
+
+def get_available_directions(sim, city):
+    """Gets available directions for the Sim to move in."""
+    directions = []
+    print(f"City object: {city}")
+    print(f"City object attributes: {city.__dict__}")
+    current_node = get_node_from_coords(sim.x, sim.y, city.width, city.height)
+    if current_node:
+        neighbors = list(city.graph.neighbors(current_node))
+        for neighbor in neighbors:
+            neighbor_coords = get_coords_from_node(neighbor, city.graph)
+            if neighbor_coords:
+                # Check if any sim is interacting at the neighbor coords
+                is_interacting = False
+                for other_sim in city.sims:
+                    if other_sim.is_interacting and math.dist((other_sim.x, other_sim.y), neighbor_coords) < 10:
+                        is_interacting = True
+                    break
+                if not is_interacting:
+                    directions.append(neighbor_coords)
+    return directions
