@@ -5,6 +5,7 @@ import uuid
 import textwrap
 import os
 from aisim.src.ai.ollama_client import OllamaClient
+from aisim.src.core.interaction import check_interactions
 from aisim.src.core.city import TILE_SIZE  # Import TILE_SIZE constant
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords
 
@@ -48,8 +49,8 @@ THOUGHT_COLOR = (240, 240, 240)  # Light grey for thought text
 THOUGHT_BG_COLOR = (50, 50, 50, 180)  # Semi-transparent dark background
 SIM_RADIUS = 5  # REMOVED
 
-# Initialize font - needs pygame.init() called first, handle in main
-pygame.font.init()  # Ensure font module is initialized
+# Initialize font - needs pygame.init() - Ensure font module is initialized
+pygame.font.init()
 SIM_FONT = pygame.font.SysFont(None, 18)  # Default system font, size 18
 
 
@@ -97,7 +98,7 @@ class Sim:
         if hasattr(self, 'last_update_time') and self.last_update_time == current_time:
             return
         self.last_update_time = current_time
-        print(f"Sim {self.sim_id}: update called at start, is_interacting={self.is_interacting}, interaction_timer={self.interaction_timer}")
+        print(f"Sim {self.sim_id}: update called at start, is_interacting={self.is_interacting}, interaction_timer={self.interaction_timer}, path={self.path}, target={self.target}")
         if self.is_interacting:
             self.interaction_timer += dt
             print(f"Sim {self.sim_id}: is_interacting=True, interaction_timer={self.interaction_timer}")
@@ -177,7 +178,7 @@ class Sim:
             self.mood = min(1.0, self.mood + 0.003 * dt)  # Slowly increase mood in good weather
 
         # --- Interaction Check ---
-        self._check_interactions(all_sims, logger, current_time)
+        check_interactions(self, all_sims, logger, current_time)
 
         # Clamp mood
         self.mood = max(-1.0, min(self.mood, 1.0))
@@ -199,6 +200,7 @@ class Sim:
 
     def _find_new_path(self, city):
         """Finds a path to a new random destination within the city."""
+        print(f"Sim {self.sim_id}: _find_new_path called")
         # Pick a random destination tile, with a bias against the center
         center_col = city.grid_width // 2
         center_row = city.grid_height // 2
@@ -216,9 +218,9 @@ class Sim:
             if random.random() < probability:
                 print(f"Sim {self.sim_id}: New destination=({dest_col}, {dest_row})")
                 break
-        print(f"Sim {self.sim_id}: get_coords_from_node dest_col={dest_col}, dest_row={dest_row}")
+        print(f"Sim {self.sim_id}: _find_new_path dest_col={dest_col}, dest_row={dest_col}, {dest_row}")
         self.target = get_coords_from_node((dest_col, dest_row), city.graph)
-        print(f"Sim {self.sim_id}: target={self.target}")
+        print(f"Sim {self.sim_id}: _find_new_path target={self.target}")
         if self.target:
             # print(f"Sim at ({self.x:.1f}, {self.y:.1f}) finding path to {self.target}") # Optional log
             new_path = get_path((self.x, self.y), self.target, city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
@@ -237,16 +239,6 @@ class Sim:
             self.target = None
             self.path_index = 0
 
-    def _load_sprite_sheet(self):
-        """Loads the Sim's sprite sheet from a predefined path."""
-        try:
-            sprite_path = os.path.join(os.path.dirname(__file__), '..', '..', 'static_dirs', 'assets', 'characters', 'original', 'Abigail_Chen.png')
-            self.sprite_sheet = pygame.image.load(sprite_path).convert_alpha()
-        except Exception as e:
-            print(f"Error loading sprite sheet: {e}")
-            self.sprite_sheet = None
-        return self.sprite_sheet
-
     def _get_sprite(self, direction):
         """Returns the appropriate sub-sprite based on the direction."""
         if not self.sprite_sheet:
@@ -257,13 +249,13 @@ class Sim:
         height = SPRITE_HEIGHT
 
         # Calculate the row and column in the sprite sheet based on direction
-        if direction == 'up':
+        if self.current_direction == 'up':
             row, col = 0, 1
-        elif direction == 'down':
+        elif self.current_direction == 'down':
             row, col = 2, 1
-        elif direction == 'left':
+        elif self.current_direction == 'left':
             row, col = 1, 0
-        elif direction == 'right':
+        elif self.current_direction == 'right':
             row, col = 1, 2
         else:
             row, col = 1, 1  # Default to facing front
@@ -278,73 +270,17 @@ class Sim:
 
         return sprite
 
-    def _check_interactions(self, all_sims, logger, current_time):
-        """Checks for and handles interactions with nearby Sims, logging them."""
-        INTERACTION_COOLDOWN = 1.0  # Minimum time between interactions (seconds)
-        if logger:
-            print(f"Sim {self.sim_id} checking interactions, enable_talking={self.enable_talking}, is_interacting={self.is_interacting}")
-        print(f"Sim {self.sim_id}: Checking interactions, is_interacting={self.is_interacting}")
-        for other_sim in all_sims:
-            if other_sim.sim_id == self.sim_id:
-                continue  # Don't interact with self
-            print(f"Sim {self.sim_id}: Checking interaction with Sim {other_sim.sim_id}")
 
-            dist = math.dist((self.x, self.y), (other_sim.x, other_sim.y))
-            print(f"Sim {self.sim_id}: current_time={current_time}, last_interaction_time={self.last_interaction_time}")
-            print(f"Sim {self.sim_id}: distance to Sim {other_sim.sim_id} = {dist}")
+    def _load_sprite_sheet(self):
+        """Loads the Sim's sprite sheet from a predefined path."""
+        try:
+            sprite_path = os.path.join(os.path.dirname(__file__), '..', '..', 'static_dirs', 'assets', 'characters', 'original', 'Abigail_Chen.png')
+            self.sprite_sheet = pygame.image.load(sprite_path).convert_alpha()
+        except Exception as e:
+            print(f"Error loading sprite sheet: {e}")
+            self.sprite_sheet = None
+        return self.sprite_sheet
 
-            if dist < INTERACTION_DISTANCE and current_time - self.last_interaction_time >= INTERACTION_COOLDOWN:
-                # Stop both sims upon interaction
-                print(f"Sim {self.sim_id}: Interacting with Sim {other_sim.sim_id}")
-                self.path = None
-                self.target = None
-                self.path_index = 0
-                other_sim.path = None
-                other_sim.target = None
-                other_sim.path_index = 0
-                self.is_interacting = True
-                other_sim.is_interacting = True
-                self.interaction_timer = 0.0
-                other_sim.interaction_timer = 0.0
-                # Update last interaction time
-                self.last_interaction_time = current_time
-                other_sim.last_interaction_time = current_time
-            # TODO: Use personality traits to influence interaction chance/outcome
-
-            # Initialize relationship if first meeting
-            if other_sim.sim_id not in self.relationships:
-                self.relationships[other_sim.sim_id] = {"friendship": 0.0, "romance": 0.0}
-            if self.sim_id not in other_sim.relationships:
-                other_sim.relationships[self.sim_id] = {"friendship": 0.0, "romance": 0.0}
-
-            # Basic interaction effect: slightly increase friendship
-            friendship_increase = 0.01  # Placeholder
-            self.relationships[other_sim.sim_id]["friendship"] = min(1.0, self.relationships[other_sim.sim_id]["friendship"] + friendship_increase)
-            other_sim.relationships[self.sim_id]["friendship"] = min(1.0, other_sim.relationships[self.sim_id]["friendship"] + friendship_increase)
-
-            # Generate thoughts about the interaction
-            if self.enable_talking and self.can_talk:
-                situation_self = f"just met {other_sim.first_name}..."  # Use first name for prompt
-                situation_other = f"just met {self.first_name}..."
-                self._generate_thought(situation_self)
-                # Note: This might trigger thoughts simultaneously, potentially overwriting quickly.
-                # A more robust system might queue thoughts or handle conversations.
-                other_sim._generate_thought(situation_other)
-            # Store interaction in memory
-            interaction_event = {"type": "interaction", "with_sim_id": other_sim.sim_id, "friendship_change": friendship_increase}
-            self.memory.append(interaction_event)
-            other_sim.memory.append({"type": "interaction", "with_sim_id": self.sim_id, "friendship_change": friendship_increase})
-
-            # Log interaction
-            if logger:
-                logger.log_interaction(current_time, self.sim_id, other_sim.sim_id, friendship_increase)
-            # Mood boost from positive interaction
-            self.mood = min(1.0, self.mood + 0.05)
-            other_sim.mood = min(1.0, other_sim.mood + 0.05)
-
-            # Update last interaction time
-            self.last_interaction_time = current_time
-            other_sim.last_interaction_time = current_time
 
     def draw(self, screen):
         """Draws the Sim and its current thought on the screen."""
@@ -381,19 +317,22 @@ class Sim:
             pygame.draw.circle(screen, mood_color, sim_pos, SIM_RADIUS)
 
         # Draw thought bubble if active
+        MAX_BUBBLE_WIDTH = 200  # Maximum width for thought bubbles
+        bubble_padding = 5
+        line_height = SIM_FONT.get_linesize()
+        
+        bubble_rect = pygame.Rect(0, 0, 0, 0) # Initialize bubble_rect
+
         if self.current_thought:
-            MAX_BUBBLE_WIDTH = 200  # Maximum width for thought bubbles
             wrapped_lines = wrap_text(self.current_thought, SIM_FONT, MAX_BUBBLE_WIDTH - 10)
 
             # Calculate total height needed
-            line_height = SIM_FONT.get_linesize()
             total_height = len(wrapped_lines) * line_height
             
             # Find the widest line
             max_line_width = max(SIM_FONT.size(line)[0] for line in wrapped_lines)
 
             # Position above the Sim
-            bubble_padding = 5
             bubble_rect = pygame.Rect(
                 sim_pos[0] - max_line_width / 2 - bubble_padding,
                 sim_pos[1] - SPRITE_HEIGHT - total_height - bubble_padding * 2,
