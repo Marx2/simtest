@@ -49,8 +49,10 @@ def get_path(start_coords, end_coords, graph, get_node_from_coords, get_coords_f
         print(f"Node not found for path calculation: start={start_node}, end={end_node}")
         return None
 
-def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size): # Add tile_size
+def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency):
     """Updates the Sim's state, following a path if available, and logs data."""
+    if not hasattr(self, 'time_since_last_direction_change'):
+        self.time_since_last_direction_change = 0.0
     if hasattr(self, 'is_interacting') and self.is_interacting:
         print(f"Sim {self.sim_id}: movement update skipped due to is_interacting=True, interaction_timer={self.interaction_timer}")
         return
@@ -84,7 +86,7 @@ def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_s
             norm_dx = dx / distance
             norm_dy = dy / distance
             # Move
-            if random.random() < 0.01:  # 1% chance to stop
+            if random.random() < 0.01:  # Reduced chance to stop
                 return
             self.x += norm_dx * self.speed * dt
             self.y += norm_dy * self.speed * dt
@@ -94,18 +96,22 @@ def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_s
 
             angle_difference = abs(new_angle - self.previous_angle)
             angle_threshold = math.pi / 2  # 90 degrees
+            self.time_since_last_direction_change += dt
+            # Check if enough time has passed since the last direction change
+            if self.time_since_last_direction_change > direction_change_frequency:
+                if angle_difference > angle_threshold:
+                    if abs(norm_dx) > abs(norm_dy):
+                        new_direction = 'right' if norm_dx > 0 else 'left'
+                    else:
+                        new_direction = 'down' if norm_dy > 0 else 'up'
 
-            if angle_difference > angle_threshold:
-                if abs(norm_dx) > abs(norm_dy):
-                    new_direction = 'right' if norm_dx > 0 else 'left'
-                else:
-                    new_direction = 'down' if norm_dy > 0 else 'up'
-
-                self.current_direction = new_direction
-                self.previous_direction = new_direction
-                self.previous_angle = new_angle
-            # print(f"Sim {self.sim_id}: Moving, direction={self.current_direction}")
-
+                    self.current_direction = new_direction
+                    self.previous_direction = new_direction
+                    self.previous_angle = new_angle
+                    self.time_since_last_direction_change = 0.0  # Reset the timer
+                    print(f"Sim {self.sim_id}: Direction changed to {self.current_direction}")
+            # Increment the timer
+            print(f"Sim {self.sim_id}: Moving, direction={self.current_direction}")
     # Update thought timer
     if self.current_thought:
         self.thought_timer -= dt

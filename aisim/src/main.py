@@ -120,7 +120,7 @@ def main():
             current_sim_time += dt # Increment simulation time
             for sim in sims:
                 # Pass city.TILE_SIZE to sim.update for arrival checks
-                sim.update(dt, city, weather.current_state, sims, logger, current_sim_time, TILE_SIZE) # Use imported TILE_SIZE
+                sim.update(dt, city, weather.current_state, sims, logger, current_sim_time, TILE_SIZE, config['movement']['direction_change_frequency']) # Use imported TILE_SIZE
                 # Interaction check is now called within sim.update, remove explicit call here
             #   sim._check_interactions(sims, logger, current_sim_time) # Removed redundant call
             weather.update(dt)

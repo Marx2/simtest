@@ -94,7 +94,7 @@ class Sim:
         self.can_talk = False  # Flag to control thought generation
 
     # REMOVED DUPLICATE _load_sprite method
-    def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size):  # Add tile_size
+    def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency):  # Add tile_size
         """Updates the Sim's state, following a path if available, and logs data."""
         if hasattr(self, 'last_update_time') and self.last_update_time == current_time:
             return
@@ -217,10 +217,10 @@ class Sim:
             distance = math.sqrt((dest_col - center_col)**2 + (dest_row - center_row)**2)
 
             # Give higher probability to tiles further from the center
-            probability = distance / max_distance
-            if random.random() < probability:
-                # print(f"Sim {self.sim_id}: New destination=({dest_col}, {dest_row})")
-                break
+            # probability = distance / max_distance # Removed bias
+            # if random.random() < probability:
+            #     # print(f"Sim {self.sim_id}: New destination=({dest_col}, {dest_row})")
+            break
         # print(f"Sim {self.sim_id}: _find_new_path dest_col={dest_col}, dest_row={dest_col}, {dest_row}")
         self.target = get_coords_from_node((dest_col, dest_row), city.graph)
         # print(f"Sim {self.sim_id}: _find_new_path target={self.target}")
