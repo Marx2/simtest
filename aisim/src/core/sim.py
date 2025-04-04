@@ -7,7 +7,8 @@ import os
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import check_interactions
 from aisim.src.core.city import TILE_SIZE  # Import TILE_SIZE constant
-from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, _find_new_path
+from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords
+from aisim.src.core.movement import update as movement_update
 
 # Common first and last names for Sims
 FIRST_NAMES = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer",
@@ -93,8 +94,10 @@ class Sim:
         self.can_talk = False  # Flag to control thought generation
 
     # REMOVED DUPLICATE _load_sprite method
-    def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency):  # Add tile_size
+    def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency): # Add tile_size
         """Updates the Sim's state, following a path if available, and logs data."""
+        # Call the movement update method
+        movement_update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency)
         if hasattr(self, 'last_update_time') and self.last_update_time == current_time:
             return
         self.last_update_time = current_time
@@ -112,55 +115,12 @@ class Sim:
         # if logger:
         #     print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}")
         if not self.is_interacting:
+            # from aisim.src.core.movement import _find_new_path
             if not self.path:
-                _find_new_path(self, city)
+                from aisim.src.core.movement import get_path, get_node_from_coords, get_coords_from_node
+                self.path = get_path((self.x, self.y), (random.randint(0, city.width), random.randint(0, city.height)), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
             if not self.path:  # Still no path (e.g., couldn't find one)
-                return  # Wait until next update to try again
-
-        # Follow the current path
-        if self.path and self.path_index < len(self.path):
-            target_x, target_y = self.path[self.path_index]
-            dx = target_x - self.x
-            dy = target_y - self.y
-            distance = math.sqrt(dx**2 + dy**2)
-
-            if distance < TILE_SIZE/4:  # Reached waypoint (1/4 tile distance)
-                self.path_index += 1
-                if self.path_index >= len(self.path):  # Reached final destination
-                    self.path = None
-                    self.target = None
-                    self.path_index = 0
-                    # Generate thought upon arrival
-                    situation = f"arrived at location ({int(self.x)}, {int(self.y)}) on a {weather_state} day"
-                    if self.enable_talking and self.can_talk:
-                        self._generate_thought(situation)
-                    self.mood = min(1.0, self.mood + 0.1)  # Mood boost for reaching destination
-            else:  # Move towards waypoint
-                # Normalize direction vector
-                norm_dx = dx / distance
-                norm_dy = dy / distance
-                # Move
-                if random.random() < 0.01:  # 1% chance to stop
-                    return
-                self.x += norm_dx * self.speed * dt
-                self.y += norm_dy * self.speed * dt
-
-                # Determine the direction of movement
-                new_angle = math.atan2(norm_dy, norm_dx)
-
-                angle_difference = abs(new_angle - self.previous_angle)
-                angle_threshold = math.pi / 2  # 90 degrees
-
-                if angle_difference > angle_threshold:
-                    if abs(norm_dx) > abs(norm_dy):
-                        new_direction = 'right' if norm_dx > 0 else 'left'
-                    else:
-                        new_direction = 'down' if norm_dy > 0 else 'up'
-
-                    self.current_direction = new_direction
-                    self.previous_direction = new_direction
-                    self.previous_angle = new_angle
-                # print(f"Sim {self.sim_id}: Moving, direction={self.current_direction}")
+                return
 
         # Update thought timer
         if self.current_thought:
@@ -190,6 +150,15 @@ class Sim:
             logger.log_mood(current_time, self.sim_id, self.mood)
 
     def _generate_thought(self, situation_description):
+        """Generates and stores a thought using Ollama."""
+        # print(f"Sim generating thought for: {situation_description}") # Optional log
+        print(f"Sim {self.sim_id}: Attempting to generate thought, enable_talking={self.enable_talking}, can_talk={self.can_talk}")
+        thought_text = self.ollama_client.generate_thought(situation_description)
+        if thought_text:
+            self.current_thought = thought_text
+            self.thought_timer = THOUGHT_DURATION
+        else:
+            print(f"Sim {self.sim_id} failed to generate thought for: {situation_description}")
         """Generates and stores a thought using Ollama."""
         # print(f"Sim generating thought for: {situation_description}") # Optional log
         print(f"Sim {self.sim_id}: Attempting to generate thought, enable_talking={self.enable_talking}, can_talk={self.can_talk}")

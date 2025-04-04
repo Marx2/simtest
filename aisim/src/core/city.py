@@ -123,6 +123,7 @@ class City:
                 if r + 1 < self.grid_height:
                     neighbor_id = (c, r + 1)
                     G.add_edge(node_id, neighbor_id, weight=1)
+        print(f"Graph has {len(G.nodes)} nodes.")
         return G
 
 
