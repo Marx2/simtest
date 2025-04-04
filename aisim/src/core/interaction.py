@@ -1,10 +1,15 @@
 import math
+import json
 
 INTERACTION_DISTANCE = 40  # Max distance for interaction (pixels)
 
 def check_interactions(self, all_sims, logger, current_time):
     """Checks for and handles interactions with nearby Sims, logging them."""
     INTERACTION_COOLDOWN = 1.0  # Minimum time between interactions (seconds)
+    # Load configuration
+    with open('aisim/config/config.json', 'r') as config_file:
+        config = json.load(config_file)
+    ignore_interaction_time = config['simulation'].get('ignore_interaction_time', 5.0)  # Default to 5.0 if not found
     # if logger:
     #     print(f"Sim {self.sim_id} checking interactions, enable_talking={self.enable_talking}, is_interacting={self.is_interacting}")
     # print(f"Sim {self.sim_id}: Checking interactions, is_interacting={self.is_interacting}")
@@ -18,7 +23,7 @@ def check_interactions(self, all_sims, logger, current_time):
         # print(f"Sim {self.sim_id}: distance to Sim {other_sim.sim_id} = {dist}")
         # print(f"Sim in distance: {(dist < INTERACTION_DISTANCE)}, time: {(current_time - self.last_interaction_time)}, >= {INTERACTION_COOLDOWN}")
 
-        if dist < INTERACTION_DISTANCE and current_time - self.last_interaction_time >= INTERACTION_COOLDOWN and not (self.is_interacting or other_sim.is_interacting):
+        if dist < INTERACTION_DISTANCE and current_time - self.last_interaction_time >= INTERACTION_COOLDOWN and not (self.is_interacting or other_sim.is_interacting) and current_time - self.last_interaction_time > ignore_interaction_time:
             # Stop both sims upon interaction
             print(f"Sim {self.sim_id}: Interacting with Sim {other_sim.sim_id}")
             self.path = None

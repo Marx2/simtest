@@ -8,7 +8,8 @@
     "initial_sims": 10,
     "fps": 60,
     "enable_talking": false,
-    "weather_transition_time": 15.0
+    "weather_transition_time": 15.0,
+    "ignore_interaction_time": 5.0
   },
   "weather": {
     "enable_weather_changes": false
