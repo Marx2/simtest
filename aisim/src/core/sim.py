@@ -208,6 +208,8 @@ class Sim:
     def get_available_directions(self, city):
         """Gets available directions for the Sim to move in."""
         directions = []
+        print(f"City object: {city}")
+        print(f"City object attributes: {city.__dict__}")
         current_node = get_node_from_coords(self.x, self.y, city.width, city.height)
         if current_node:
             neighbors = list(city.graph.neighbors(current_node))

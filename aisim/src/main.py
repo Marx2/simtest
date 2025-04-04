@@ -67,6 +67,8 @@ def main():
             enable_talking # Enable/disable talking from config
         ) for _ in range(sim_config['initial_sims'])
     ]
+    # Add sims to city
+    city.sims = sims
     # Allow sims to talk after display is initialized
     logger = Logger() # Create logger instance
 
@@ -170,7 +172,6 @@ def main():
         pygame.display.flip()  # Update the full display Surface to the screen
         for sim in sims:
             sim.can_talk = True
-
 
 
     # --- End of main loop ---

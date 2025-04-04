@@ -15,6 +15,7 @@ class City:
     """Represents the city environment."""
     def __init__(self, width, height):
         """Initializes the city grid."""
+        print("City constructor called")
         self.width = width
         self.height = height
         self.grid_width = width // TILE_SIZE
@@ -22,6 +23,7 @@ class City:
         self.graph = self._create_grid_graph()
         self._load_tilesets()
         self._create_tile_map() # Create a map of which tile to draw where
+        self.sims = [] # Initialize sims list
 
     def _load_tilesets(self):
         """Loads the required tileset images."""
