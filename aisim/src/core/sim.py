@@ -10,14 +10,21 @@ from aisim.src.core.city import TILE_SIZE  # Import TILE_SIZE constant
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords
 from aisim.src.core.movement import update as movement_update
 
-# Common first and last names for Sims
-FIRST_NAMES = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer",
-               "Michael", "Linda", "William", "Elizabeth", "David", "Barbara",
-               "Richard", "Susan", "Joseph", "Jessica", "Thomas", "Sarah"]
+import os
 
-LAST_NAMES = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller",
-             "Davis", "Garcia", "Rodriguez", "Wilson", "Martinez", "Anderson",
-             "Taylor", "Thomas", "Hernandez", "Moore", "Martin", "Jackson"]
+# Define the directory containing character sprites
+CHARACTER_SPRITE_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'graphics', 'characters')
+
+def get_character_names():
+    """Extracts character names from sprite filenames in the specified directory."""
+    names = []
+    for filename in os.listdir(CHARACTER_SPRITE_DIR):
+        if filename.endswith(".png"):
+            name = filename[:-4]  # Remove ".png" extension
+            names.append(name)
+    return names
+
+CHARACTER_NAMES = get_character_names()
 
 
 def wrap_text(text, font, max_width):
@@ -64,13 +71,12 @@ class Sim:
         self.interaction_timer = 0.0
         self.talking_with = None # sim_id of the sim they are talking to
         self.sprite_sheet = None
-        self._load_sprite_sheet()
+        self.character_name, self.sprite_sheet = self._load_sprite_sheet()
         self.current_direction = 'front'
         self.previous_direction = 'front'
         self.previous_angle = 0.0
-        self.first_name = random.choice(FIRST_NAMES)
-        self.last_name = random.choice(LAST_NAMES)
-        self.full_name = f"{self.first_name} {self.last_name}"
+        self.first_name, self.last_name = self.character_name.split("_")
+        self.full_name = self.character_name
         self.x = x
         self.y = y
         self.speed = random.uniform(30, 70)  # Random speed for each sim
@@ -214,14 +220,21 @@ class Sim:
 
 
     def _load_sprite_sheet(self):
-        """Loads the Sim's sprite sheet from a predefined path."""
-        try:
-            sprite_path = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'graphics', 'characters', 'Abigail_Chen.png')
-            self.sprite_sheet = pygame.image.load(sprite_path).convert_alpha()
-        except Exception as e:
-            print(f"Error loading sprite sheet: {e}")
-            self.sprite_sheet = None
-        return self.sprite_sheet
+       """Loads a random Sim's sprite sheet from the character sprites directory."""
+       try:
+           available_characters = [f for f in os.listdir(CHARACTER_SPRITE_DIR) if f.endswith('.png')]
+           if not available_characters:
+               print("No character sprites found!")
+               return None, None
+
+           chosen_sprite = random.choice(available_characters)
+           sprite_path = os.path.join(CHARACTER_SPRITE_DIR, chosen_sprite)
+           sprite_sheet = pygame.image.load(sprite_path).convert_alpha()
+           character_name = chosen_sprite[:-4]  # Remove ".png" extension
+           return character_name, sprite_sheet
+       except Exception as e:
+           print(f"Error loading sprite sheet: {e}")
+           return None, None
 
 
     def draw(self, screen):
