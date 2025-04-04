@@ -51,6 +51,10 @@ def get_path(start_coords, end_coords, graph, get_node_from_coords, get_coords_f
 
 def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size): # Add tile_size
     """Updates the Sim's state, following a path if available, and logs data."""
+    if hasattr(self, 'is_interacting') and self.is_interacting:
+        print(f"Sim {self.sim_id}: movement update skipped due to is_interacting=True, interaction_timer={self.interaction_timer}")
+        return
+        return
     if logger:
         print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}")
     if not self.path:
