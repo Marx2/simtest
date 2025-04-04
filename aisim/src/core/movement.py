@@ -17,7 +17,9 @@ def get_tile_coords(x, y, grid_width, grid_height):
 
 def get_node_from_coords(x, y, grid_width, grid_height):
     """Finds the graph node closest to the given pixel coordinates."""
-    return get_tile_coords(x, y, grid_width, grid_height) # Node ID is the tile coord tuple
+    col, row = get_tile_coords(x, y, grid_width, grid_height)
+    # print(f"get_node_from_coords called: x={x}, y={y}, grid_width={grid_width}, grid_height={grid_height}, col={col}, row={row}")
+    return (col, row) # Node ID is the tile coord tuple
 
 def get_coords_from_node(node, graph):
     """Gets the center pixel coordinates of a given graph node."""
@@ -28,11 +30,20 @@ def get_coords_from_node(node, graph):
 
 def get_path(start_coords, end_coords, graph, get_node_from_coords, get_coords_from_node, city_width, city_height):
     """Calculates the shortest path using A*."""
+    # Clamp end_coords to grid bounds
+    end_x = max(0, min(end_coords[0], city_width - 1))
+    end_y = max(0, min(end_coords[1], city_height - 1))
+    end_coords = (end_x, end_y)
+    # print(f"get_path called: start_coords={start_coords}, end_coords={end_coords}")
     start_node = get_node_from_coords(start_coords[0], start_coords[1], city_width, city_height)
+    start_node = (max(0, min(start_node[0], city_width // TILE_SIZE - 1)), max(0, min(start_node[1], city_height // TILE_SIZE - 1)))
     end_node = get_node_from_coords(end_coords[0], end_coords[1], city_width, city_height)
+    # Clamp start and end nodes to grid bounds
+    start_node = (max(0, min(start_node[0], city_width // TILE_SIZE - 1)), max(0, min(start_node[1], city_height // TILE_SIZE - 1)))
+    end_node = (max(0, min(end_node[0], city_width // TILE_SIZE - 1)), max(0, min(end_node[1], city_height // TILE_SIZE - 1)))
 
     if start_node == end_node:
-        return None # Already at destination
+        return None  # Already at destination
 
     try:
         # A* heuristic: Euclidean distance
@@ -43,28 +54,35 @@ def get_path(start_coords, end_coords, graph, get_node_from_coords, get_coords_f
 
         path_nodes = nx.astar_path(graph, start_node, end_node, heuristic=heuristic, weight='weight')
         # Convert node path back to coordinate path
+        # print(f"Path found from {start_node} to {end_node}: {path_nodes}") # Log found path nodes
         path_coords = [get_coords_from_node(node, graph) for node in path_nodes]
         return path_coords
     except nx.NetworkXNoPath:
         print(f"No path found between {start_node} and {end_node}")
         return None
-    except nx.NodeNotFound:
-        print(f"Node not found for path calculation: start={start_node}, end={end_node}")
+    except nx.NodeNotFound as e:
+        print(f"Node not found for path calculation: start={start_node}, end={end_node}, error={e}")
         return None
 
 def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency):
     """Updates the Sim's state, following a path if available, and logs data."""
+    # print(f"Sim {sim.sim_id}: movement update called, x={sim.x:.2f}, y={sim.y:.2f}, target={sim.target}, path={sim.path}, path_index={sim.path_index}")
     if not hasattr(sim, 'time_since_last_direction_change'):
         sim.time_since_last_direction_change = 0.0
     if hasattr(sim, 'is_interacting') and sim.is_interacting:
-        print(f"Sim {sim.sim_id}: movement update skipped due to is_interacting=True, interaction_timer={sim.interaction_timer}")
+        # print(f"Sim {sim.sim_id}: movement update skipped due to is_interacting=True, interaction_timer={sim.interaction_timer}")
         return
     # if logger:
         # print(f"Sim {sim.sim_id} update: x={sim.x:.2f}, y={sim.y:.2f}, target={sim.target}")
+    # Clamp Sim coordinates to grid bounds
+    sim.x = max(0, min(sim.x, city.width - 1))
+    sim.y = max(0, min(sim.y, city.height - 1))
+
     if not sim.path:
         # from aisim.src.core.sim import get_path, get_node_from_coords, get_coords_from_node
         sim.path = get_path((sim.x, sim.y), (random.randint(0, city.width), random.randint(0, city.height)), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
-        if not sim.path: # Still no path (e.g., couldn't find one)
+        # print(f"Sim {sim.sim_id}: New path assigned in movement_update: {sim.path}") # Log path assignment
+        if not sim.path:  # Still no path (e.g., couldn't find one)
             return # Wait until next update to try again
 
     # Follow the current path
@@ -75,8 +93,10 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
         distance = math.sqrt(dx**2 + dy**2)
 
         if distance < TILE_SIZE/4: # Reached waypoint (1/4 tile distance)
+            # print(f"Sim {sim.sim_id}: Reached waypoint {sim.path_index} at ({sim.x:.1f}, {sim.y:.1f}), target was ({target_x:.1f}, {target_y:.1f})")
             sim.path_index += 1
             if sim.path_index >= len(sim.path): # Reached final destination
+                # print(f"Sim {sim.sim_id}: Reached final destination at ({sim.x:.1f}, {sim.y:.1f})")
                 sim.path = None
                 sim.target = None
                 sim.path_index = 0
@@ -93,7 +113,7 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
                 return
             sim.x += norm_dx * sim.speed * dt
             sim.y += norm_dy * sim.speed * dt
-            
+
             # Determine the direction of movement
             new_angle = math.atan2(norm_dy, norm_dx)
 
@@ -112,19 +132,19 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
                     sim.previous_direction = new_direction
                     sim.previous_angle = new_angle
                     sim.time_since_last_direction_change = 0.0  # Reset the timer
-                    print(f"Sim {sim.sim_id}: Direction changed to {sim.current_direction}")
+                    # print(f"Sim {sim.sim_id}: Direction changed to {sim.current_direction}")
             # Increment the timer
-            print(f"Sim {sim.sim_id}: Moving, direction={sim.current_direction}")
+            # print(f"Sim {sim.sim_id}: Moving, direction={sim.current_direction}")
     # Update thought timer
     if sim.current_thought:
         sim.thought_timer -= dt
         if sim.thought_timer <= 0:
             sim.current_thought = None
-    else:
-         # Path finished or invalid state, try finding a new one next update
-         sim.path = None
-         sim.target = None
-         sim.path_index = 0
+    # else:
+    #      # Path finished or invalid state, try finding a new one next update
+    #      sim.path = None
+    #      sim.target = None
+    #      sim.path_index = 0
 
     # --- Mood Update based on Weather ---
     if weather_state in ["Rainy", "Snowy"]:

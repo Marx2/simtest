@@ -96,6 +96,7 @@ class Sim:
     # REMOVED DUPLICATE _load_sprite method
     def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency): # Add tile_size
         """Updates the Sim's state, following a path if available, and logs data."""
+        # print(f"Sim {self.sim_id}: update called at start, x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}, path={self.path}")
         # Call the movement update method
         movement_update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency)
         if hasattr(self, 'last_update_time') and self.last_update_time == current_time:
@@ -115,9 +116,7 @@ class Sim:
         # if logger:
         #     print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}")
         if not self.is_interacting:
-            # from aisim.src.core.movement import _find_new_path
             if not self.path:
-                from aisim.src.core.movement import get_path, get_node_from_coords, get_coords_from_node
                 self.path = get_path((self.x, self.y), (random.randint(0, city.width), random.randint(0, city.height)), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
             if not self.path:  # Still no path (e.g., couldn't find one)
                 return
@@ -127,11 +126,7 @@ class Sim:
             self.thought_timer -= dt
             if self.thought_timer <= 0:
                 self.current_thought = None
-        else:
-            # Path finished or invalid state, try finding a new one next update
-            self.path = None
-            self.target = None
-            self.path_index = 0
+        # Removed redundant path reset logic that was causing Sims to stop
 
         # --- Mood Update based on Weather ---
         if weather_state in ["Rainy", "Snowy"]:
@@ -152,22 +147,20 @@ class Sim:
     def _generate_thought(self, situation_description):
         """Generates and stores a thought using Ollama."""
         # print(f"Sim generating thought for: {situation_description}") # Optional log
-        print(f"Sim {self.sim_id}: Attempting to generate thought, enable_talking={self.enable_talking}, can_talk={self.can_talk}")
-        thought_text = self.ollama_client.generate_thought(situation_description)
-        if thought_text:
-            self.current_thought = thought_text
-            self.thought_timer = THOUGHT_DURATION
+        if (self.enable_talking and self.can_talk):
+            thought_text = self.ollama_client.generate_thought(situation_description)
+            if thought_text:
+                self.current_thought = thought_text
+                self.thought_timer = THOUGHT_DURATION
+            print(f"Sim {self.sim_id}: Attempting to generate thought, enable_talking={self.enable_talking}, can_talk={self.can_talk}")
+            thought_text = self.ollama_client.generate_thought(situation_description)
+            if thought_text:
+                self.current_thought = thought_text
+                self.thought_timer = THOUGHT_DURATION
+            else:
+                print(f"Sim {self.sim_id} failed to generate thought for: {situation_description}")
         else:
-            print(f"Sim {self.sim_id} failed to generate thought for: {situation_description}")
-        """Generates and stores a thought using Ollama."""
-        # print(f"Sim generating thought for: {situation_description}") # Optional log
-        print(f"Sim {self.sim_id}: Attempting to generate thought, enable_talking={self.enable_talking}, can_talk={self.can_talk}")
-        thought_text = self.ollama_client.generate_thought(situation_description)
-        if thought_text:
-            self.current_thought = thought_text
-            self.thought_timer = THOUGHT_DURATION
-        else:
-            print(f"Sim {self.sim_id} failed to generate thought for: {situation_description}")
+            print(f"Sim {self.sim_id} talking blocked")
 
     def _get_sprite(self, direction):
         """Returns the appropriate sub-sprite based on the direction."""

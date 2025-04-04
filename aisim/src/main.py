@@ -60,9 +60,9 @@ def main():
     enable_talking = config['simulation']['enable_talking']
     sims = [
         Sim(
-            str(uuid.uuid4()), # Generate unique ID
-            random.randint(0, SCREEN_WIDTH),
-            random.randint(0, SCREEN_HEIGHT),
+            str(uuid.uuid4()),  # Generate unique ID
+            max(0, min(random.randint(0, SCREEN_WIDTH), SCREEN_WIDTH - TILE_SIZE -1)),
+            max(0, min(random.randint(0, SCREEN_HEIGHT), SCREEN_HEIGHT - TILE_SIZE -1)),
             ollama_client, # Pass the client instance
             enable_talking # Enable/disable talking from config
         ) for _ in range(sim_config['initial_sims'])
