@@ -168,10 +168,11 @@ class Sim:
 
     def update_animation(self, dt):
         """Updates the animation frame based on elapsed time."""
-        self.animation_timer += dt
-        if self.animation_timer >= self.animation_speed:
-            self.animation_timer -= self.animation_speed
-            self.animation_frame = (self.animation_frame + 1) % 3 # Cycle through 3 columns (0, 1, 2)
+        if not self.is_interacting:
+            self.animation_timer += dt
+            if self.animation_timer >= self.animation_speed:
+                self.animation_timer -= self.animation_speed
+                self.animation_frame = (self.animation_frame + 1) % 3 # Cycle through 3 columns (0, 1, 2)
 
     def _get_sprite(self):
         """Returns the appropriate sub-sprite based on the direction and animation frame."""
