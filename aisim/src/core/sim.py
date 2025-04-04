@@ -7,8 +7,7 @@ import os
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import check_interactions
 from aisim.src.core.city import TILE_SIZE  # Import TILE_SIZE constant
-from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords
-
+from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, _find_new_path
 
 # Common first and last names for Sims
 FIRST_NAMES = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer",
@@ -114,7 +113,7 @@ class Sim:
         #     print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}")
         if not self.is_interacting:
             if not self.path:
-                self._find_new_path(city)
+                _find_new_path(self, city)
             if not self.path:  # Still no path (e.g., couldn't find one)
                 return  # Wait until next update to try again
 
@@ -200,47 +199,6 @@ class Sim:
             self.thought_timer = THOUGHT_DURATION
         else:
             print(f"Sim {self.sim_id} failed to generate thought for: {situation_description}")
-
-    def _find_new_path(self, city):
-        """Finds a path to a new random destination within the city."""
-        # print(f"Sim {self.sim_id}: _find_new_path called")
-        # Pick a random destination tile, with a bias against the center
-        center_col = city.grid_width // 2
-        center_row = city.grid_height // 2
-        max_distance = max(center_col, center_row)
-
-        while True:
-            dest_col = random.randint(0, city.grid_width - 1)
-            dest_row = random.randint(0, city.grid_height - 1)
-
-            # Calculate distance from the center
-            distance = math.sqrt((dest_col - center_col)**2 + (dest_row - center_row)**2)
-
-            # Give higher probability to tiles further from the center
-            # probability = distance / max_distance # Removed bias
-            # if random.random() < probability:
-            #     # print(f"Sim {self.sim_id}: New destination=({dest_col}, {dest_row})")
-            break
-        # print(f"Sim {self.sim_id}: _find_new_path dest_col={dest_col}, dest_row={dest_col}, {dest_row}")
-        self.target = get_coords_from_node((dest_col, dest_row), city.graph)
-        # print(f"Sim {self.sim_id}: _find_new_path target={self.target}")
-        if self.target:
-            # print(f"Sim at ({self.x:.1f}, {self.y:.1f}) finding path to {self.target}") # Optional log
-            new_path = get_path((self.x, self.y), self.target, city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
-            if new_path and len(new_path) > 1:  # Ensure path has more than just the start node
-                self.path = new_path
-                self.path_index = 1  # Start moving towards the second node in the path
-                # print(f"Path found: {len(self.path)} steps") # Optional log
-            else:
-                # print("Path not found or too short.") # Optional log
-                self.path = None
-                self.target = None
-                self.path_index = 0
-        else:
-            # print("Could not determine target coordinates.") # Optional log
-            self.path = None
-            self.target = None
-            self.path_index = 0
 
     def _get_sprite(self, direction):
         """Returns the appropriate sub-sprite based on the direction."""

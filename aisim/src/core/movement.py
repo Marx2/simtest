@@ -158,11 +158,12 @@ def _find_new_path(self, city):
         if random.random() < probability:
             # print(f"Sim {self.sim_id}: New destination=({dest_col}, {dest_row})")
             break
-    self.target = city.get_coords_from_node((dest_col, dest_row))
+    node_id = (dest_col, dest_row)
+    self.target = get_coords_from_node(node_id, city.graph)
 
     if self.target:
         # print(f"Sim at ({self.x:.1f}, {self.y:.1f}) finding path to {self.target}") # Optional log
-        new_path = city.get_path((self.x, self.y), self.target)
+        new_path = get_path((self.x, self.y), self.target, city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
         if new_path and len(new_path) > 1: # Ensure path has more than just the start node
             self.path = new_path
             self.path_index = 1 # Start moving towards the second node in the path
