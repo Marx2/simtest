@@ -18,7 +18,7 @@ def check_interactions(self, all_sims, logger, current_time):
         # print(f"Sim {self.sim_id}: distance to Sim {other_sim.sim_id} = {dist}")
         # print(f"Sim in distance: {(dist < INTERACTION_DISTANCE)}, time: {(current_time - self.last_interaction_time)}, >= {INTERACTION_COOLDOWN}")
 
-        if dist < INTERACTION_DISTANCE and current_time - self.last_interaction_time >= INTERACTION_COOLDOWN:
+        if dist < INTERACTION_DISTANCE and current_time - self.last_interaction_time >= INTERACTION_COOLDOWN and not (self.is_interacting or other_sim.is_interacting):
             # Stop both sims upon interaction
             print(f"Sim {self.sim_id}: Interacting with Sim {other_sim.sim_id}")
             self.path = None
@@ -31,9 +31,12 @@ def check_interactions(self, all_sims, logger, current_time):
             other_sim.is_interacting = True
             self.interaction_timer = 0.0
             other_sim.interaction_timer = 0.0
+            self.talking_with = other_sim.sim_id
+            other_sim.talking_with = self.sim_id
             # Update last interaction time
             self.last_interaction_time = current_time
             other_sim.last_interaction_time = current_time
+            
         # TODO: Use personality traits to influence interaction chance/outcome
 
         # Initialize relationship if first meeting

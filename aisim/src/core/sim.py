@@ -62,6 +62,7 @@ class Sim:
         self.sim_id = sim_id  # Store the unique ID
         self.is_interacting = False
         self.interaction_timer = 0.0
+        self.talking_with = None # sim_id of the sim they are talking to
         self.sprite_sheet = None
         self._load_sprite_sheet()
         self.current_direction = 'front'
@@ -105,6 +106,7 @@ class Sim:
             # print(f"Sim {self.sim_id}: is_interacting=True, interaction_timer={self.interaction_timer}")
             if self.interaction_timer > random.uniform(3, 20):
                 self.is_interacting = False
+                self.talking_with = None
                 # print(f"Sim {self.sim_id}: interaction timer expired, is_interacting set to False")
                 return
 
