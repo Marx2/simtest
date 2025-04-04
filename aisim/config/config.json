@@ -5,7 +5,7 @@
     "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble."
   },
   "simulation": {
-    "initial_sims": 10,
+    "initial_sims": 1,
     "fps": 60,
     "enable_talking": false,
     "weather_transition_time": 15.0,

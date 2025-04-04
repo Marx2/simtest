@@ -92,13 +92,17 @@ class Sim:
         self.last_interaction_time = 0.0  # Time of last interaction
         self.enable_talking = enable_talking
         self.can_talk = False  # Flag to control thought generation
-
+        # Animation attributes
+        self.animation_frame = 0
+        self.animation_timer = 0.0
+        self.animation_speed = 0.15 # Time between frames in seconds
     # REMOVED DUPLICATE _load_sprite method
     def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency): # Add tile_size
         """Updates the Sim's state, following a path if available, and logs data."""
         # print(f"Sim {self.sim_id}: update called at start, x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}, path={self.path}")
         # Call the movement update method
         movement_update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency)
+        self.update_animation(dt) # Update animation frame
         if hasattr(self, 'last_update_time') and self.last_update_time == current_time:
             return
         self.last_update_time = current_time
@@ -162,8 +166,15 @@ class Sim:
         else:
             print(f"Sim {self.sim_id} talking blocked")
 
-    def _get_sprite(self, direction):
-        """Returns the appropriate sub-sprite based on the direction."""
+    def update_animation(self, dt):
+        """Updates the animation frame based on elapsed time."""
+        self.animation_timer += dt
+        if self.animation_timer >= self.animation_speed:
+            self.animation_timer -= self.animation_speed
+            self.animation_frame = (self.animation_frame + 1) % 3 # Cycle through 3 columns (0, 1, 2)
+
+    def _get_sprite(self):
+        """Returns the appropriate sub-sprite based on the direction and animation frame."""
         if not self.sprite_sheet:
             return None
 
@@ -171,17 +182,25 @@ class Sim:
         width = SPRITE_WIDTH
         height = SPRITE_HEIGHT
 
-        # Calculate the row and column in the sprite sheet based on direction
-        if self.current_direction == 'up':
-            row, col = 0, 1
-        elif self.current_direction == 'down':
-            row, col = 2, 1
+        # Determine row based on direction (0-based index)
+        # Row 0: down (Task desc: Row 1)
+        # Row 1: left (Task desc: Row 2)
+        # Row 2: right (Task desc: Row 3)
+        # Row 3: up (Task desc: Row 4)
+        if self.current_direction == 'down':
+            row = 0
         elif self.current_direction == 'left':
-            row, col = 1, 0
+            row = 1
         elif self.current_direction == 'right':
-            row, col = 1, 2
-        else:
-            row, col = 1, 1  # Default to facing front
+            row = 2
+        elif self.current_direction == 'up':
+            row = 3
+        else: # Default/idle (e.g., 'front') - use 'down' row, middle frame
+            row = 0
+            self.animation_frame = 1 # Use middle frame when idle/front
+
+        # Use the current animation frame for the column
+        col = self.animation_frame
 
         # Calculate the position of the sub-sprite in the sprite sheet
         x = col * width
@@ -210,7 +229,7 @@ class Sim:
         sim_pos = (int(self.x), int(self.y))
 
         # Get the sprite based on the current direction
-        sprite = self._get_sprite(self.current_direction)
+        sprite = self._get_sprite() # Get sprite based on direction and animation frame
 
         # Draw Sim sprite or fallback circle
         if sprite:
