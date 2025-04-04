@@ -98,20 +98,21 @@ class Sim:
         if hasattr(self, 'last_update_time') and self.last_update_time == current_time:
             return
         self.last_update_time = current_time
-        print(f"Sim {self.sim_id}: update called at start, is_interacting={self.is_interacting}, interaction_timer={self.interaction_timer}, path={self.path}, target={self.target}")
+        # print(f"Sim {self.sim_id}: update called at start, is_interacting={self.is_interacting}, interaction_timer={self.interaction_timer}, path={self.path}, target={self.target}, is_interacting={self.is_interacting}")
         if self.is_interacting:
             self.interaction_timer += dt
-            print(f"Sim {self.sim_id}: is_interacting=True, interaction_timer={self.interaction_timer}")
-            print(f"Sim {self.sim_id}: is_interacting=True, interaction_timer={self.interaction_timer}")
+            # print(f"Sim {self.sim_id}: is_interacting=True, interaction_timer={self.interaction_timer}")
+            # print(f"Sim {self.sim_id}: is_interacting=True, interaction_timer={self.interaction_timer}")
             if self.interaction_timer > random.uniform(3, 20):
                 self.is_interacting = False
-                print(f"Sim {self.sim_id}: interaction timer expired, is_interacting set to False")
+                # print(f"Sim {self.sim_id}: interaction timer expired, is_interacting set to False")
                 return
 
-        if logger:
-            print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}")
-        if not self.path:
-            self._find_new_path(city)
+        # if logger:
+        #     print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}")
+        if not self.is_interacting:
+            if not self.path:
+                self._find_new_path(city)
             if not self.path:  # Still no path (e.g., couldn't find one)
                 return  # Wait until next update to try again
 
@@ -158,7 +159,7 @@ class Sim:
                     self.current_direction = new_direction
                     self.previous_direction = new_direction
                     self.previous_angle = new_angle
-                print(f"Sim {self.sim_id}: Moving, direction={self.current_direction}")
+                # print(f"Sim {self.sim_id}: Moving, direction={self.current_direction}")
 
         # Update thought timer
         if self.current_thought:
@@ -200,7 +201,7 @@ class Sim:
 
     def _find_new_path(self, city):
         """Finds a path to a new random destination within the city."""
-        print(f"Sim {self.sim_id}: _find_new_path called")
+        # print(f"Sim {self.sim_id}: _find_new_path called")
         # Pick a random destination tile, with a bias against the center
         center_col = city.grid_width // 2
         center_row = city.grid_height // 2
@@ -216,11 +217,11 @@ class Sim:
             # Give higher probability to tiles further from the center
             probability = distance / max_distance
             if random.random() < probability:
-                print(f"Sim {self.sim_id}: New destination=({dest_col}, {dest_row})")
+                # print(f"Sim {self.sim_id}: New destination=({dest_col}, {dest_row})")
                 break
-        print(f"Sim {self.sim_id}: _find_new_path dest_col={dest_col}, dest_row={dest_col}, {dest_row}")
+        # print(f"Sim {self.sim_id}: _find_new_path dest_col={dest_col}, dest_row={dest_col}, {dest_row}")
         self.target = get_coords_from_node((dest_col, dest_row), city.graph)
-        print(f"Sim {self.sim_id}: _find_new_path target={self.target}")
+        # print(f"Sim {self.sim_id}: _find_new_path target={self.target}")
         if self.target:
             # print(f"Sim at ({self.x:.1f}, {self.y:.1f}) finding path to {self.target}") # Optional log
             new_path = get_path((self.x, self.y), self.target, city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)

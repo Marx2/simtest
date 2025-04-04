@@ -1,21 +1,22 @@
 import math
 
-INTERACTION_DISTANCE = 20  # Max distance for interaction (pixels)
+INTERACTION_DISTANCE = 40  # Max distance for interaction (pixels)
 
 def check_interactions(self, all_sims, logger, current_time):
     """Checks for and handles interactions with nearby Sims, logging them."""
     INTERACTION_COOLDOWN = 1.0  # Minimum time between interactions (seconds)
-    if logger:
-        print(f"Sim {self.sim_id} checking interactions, enable_talking={self.enable_talking}, is_interacting={self.is_interacting}")
-    print(f"Sim {self.sim_id}: Checking interactions, is_interacting={self.is_interacting}")
+    # if logger:
+    #     print(f"Sim {self.sim_id} checking interactions, enable_talking={self.enable_talking}, is_interacting={self.is_interacting}")
+    # print(f"Sim {self.sim_id}: Checking interactions, is_interacting={self.is_interacting}")
     for other_sim in all_sims:
         if other_sim.sim_id == self.sim_id:
             continue  # Don't interact with self
-        print(f"Sim {self.sim_id}: Checking interaction with Sim {other_sim.sim_id}")
+        # print(f"Sim {self.sim_id}: Checking interaction with Sim {other_sim.sim_id}")
 
         dist = math.dist((self.x, self.y), (other_sim.x, other_sim.y))
-        print(f"Sim {self.sim_id}: current_time={current_time}, last_interaction_time={self.last_interaction_time}")
-        print(f"Sim {self.sim_id}: distance to Sim {other_sim.sim_id} = {dist}")
+        # print(f"Sim {self.sim_id}: current_time={current_time}, last_interaction_time={self.last_interaction_time}")
+        # print(f"Sim {self.sim_id}: distance to Sim {other_sim.sim_id} = {dist}")
+        # print(f"Sim in distance: {(dist < INTERACTION_DISTANCE)}, time: {(current_time - self.last_interaction_time)}, >= {INTERACTION_COOLDOWN}")
 
         if dist < INTERACTION_DISTANCE and current_time - self.last_interaction_time >= INTERACTION_COOLDOWN:
             # Stop both sims upon interaction
@@ -65,7 +66,3 @@ def check_interactions(self, all_sims, logger, current_time):
         # Mood boost from positive interaction
         self.mood = min(1.0, self.mood + 0.05)
         other_sim.mood = min(1.0, other_sim.mood + 0.05)
-
-        # Update last interaction time
-        self.last_interaction_time = current_time
-        other_sim.last_interaction_time = current_time

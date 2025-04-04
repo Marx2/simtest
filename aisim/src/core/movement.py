@@ -55,8 +55,8 @@ def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_s
         print(f"Sim {self.sim_id}: movement update skipped due to is_interacting=True, interaction_timer={self.interaction_timer}")
         return
         return
-    if logger:
-        print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}")
+    # if logger:
+        # print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}")
     if not self.path:
         self._find_new_path(city)
         if not self.path: # Still no path (e.g., couldn't find one)
@@ -104,7 +104,7 @@ def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_s
                 self.current_direction = new_direction
                 self.previous_direction = new_direction
                 self.previous_angle = new_angle
-            print(f"Sim {self.sim_id}: Moving, direction={self.current_direction}")
+            # print(f"Sim {self.sim_id}: Moving, direction={self.current_direction}")
 
     # Update thought timer
     if self.current_thought:
@@ -150,7 +150,7 @@ def _find_new_path(self, city):
         # Give higher probability to tiles further from the center
         probability = distance / max_distance
         if random.random() < probability:
-            print(f"Sim {self.sim_id}: New destination=({dest_col}, {dest_row})")
+            # print(f"Sim {self.sim_id}: New destination=({dest_col}, {dest_row})")
             break
     self.target = city.get_coords_from_node((dest_col, dest_row))
 
