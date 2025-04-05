@@ -180,20 +180,17 @@ class Sim:
         change_direction(self, city, direction_change_frequency)
 
     def _generate_thought(self, situation_description):
-        """Generates and stores a thought using Ollama."""
+        """Requests thought generation asynchronously using Ollama."""
         # print(f"Sim generating thought for: {situation_description}") # Optional log
-        if (self.enable_talking and self.can_talk):
-            thought_text = self.ollama_client.generate_thought(situation_description)
-            if thought_text:
-                self.current_thought = thought_text
-                self.thought_timer = THOUGHT_DURATION
-            print(f"Sim {self.sim_id}: Attempting to generate thought, enable_talking={self.enable_talking}, can_talk={self.can_talk}")
-            thought_text = self.ollama_client.generate_thought(situation_description)
-            if thought_text:
-                self.current_thought = thought_text
-                self.thought_timer = THOUGHT_DURATION
+        if self.enable_talking and self.can_talk:
+            print(f"Sim {self.sim_id}: Requesting thought generation for: {situation_description}, enable_talking={self.enable_talking}, can_talk={self.can_talk}")
+            # Request generation, but don't wait for the result here.
+            # The main loop will poll the OllamaClient for results.
+            request_sent = self.ollama_client.request_thought_generation(self.sim_id, situation_description)
+            if not request_sent:
+                print(f"Sim {self.sim_id}: Thought generation request ignored (already active).")
             else:
-                print(f"Sim {self.sim_id} failed to generate thought for: {situation_description}")
+                print(f"Sim {self.sim_id}: Thought generation requested.")
         else:
             print(f"Sim {self.sim_id} talking blocked")
 

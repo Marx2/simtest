@@ -7,12 +7,13 @@ import sys
 import random
 import uuid
 import json
-import os
+import os # Keep os import
 from aisim.src.core.sim import Sim
 from aisim.src.core.weather import Weather
 from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.logger import Logger
+from aisim.src.core.sim import THOUGHT_DURATION # Added import
 # Constants (Defaults, will be overridden by config)
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
@@ -58,17 +59,21 @@ def main():
     weather = Weather(sim_config) # Pass simulation config
     city = City(SCREEN_WIDTH, SCREEN_HEIGHT)
     enable_talking = config['simulation']['enable_talking']
-    sims = [
-        Sim(
+
+    # Store sims in a dictionary for easy lookup by ID
+    sims_dict = {}
+    for _ in range(sim_config['initial_sims']):
+        new_sim = Sim(
             str(uuid.uuid4()),  # Generate unique ID
             max(0, min(random.randint(0, SCREEN_WIDTH), SCREEN_WIDTH - TILE_SIZE -1)),
             max(0, min(random.randint(0, SCREEN_HEIGHT), SCREEN_HEIGHT - TILE_SIZE -1)),
             ollama_client, # Pass the client instance
             enable_talking # Enable/disable talking from config
-        ) for _ in range(sim_config['initial_sims'])
-    ]
+        )
+        sims_dict[new_sim.sim_id] = new_sim
+
     # Add sims to city
-    city.sims = sims
+    city.sims = list(sims_dict.values()) # City might still expect a list
     # Allow sims to talk after display is initialized
     logger = Logger() # Create logger instance
 
@@ -98,7 +103,7 @@ def main():
                     clicked_sim = None
                     min_dist_sq = float('inf')
                     # Find the closest sim to the click, within a small radius
-                    for sim in sims:
+                    for sim in sims_dict.values(): # Iterate over dict values
                         dist_sq = (sim.x - mouse_x)**2 + (sim.y - mouse_y)**2
                         if dist_sq < 400 and dist_sq < min_dist_sq: # Click within ~20px radius (4x typical Sim radius)
                             min_dist_sq = dist_sq
@@ -120,13 +125,26 @@ def main():
         # Only update simulation logic if time is passing
         if dt > 0: # Only update simulation state if not paused
             current_sim_time += dt # Increment simulation time
-            for sim in sims:
+            all_sims_list = list(sims_dict.values()) # Get list for passing to update
+            for sim in all_sims_list:
                 # Pass city.TILE_SIZE to sim.update for arrival checks
-                sim.update(dt, city, weather.current_state, sims, logger, current_sim_time, TILE_SIZE, config['movement']['direction_change_frequency']) # Use imported TILE_SIZE
+                sim.update(dt, city, weather.current_state, all_sims_list, logger, current_sim_time, TILE_SIZE, config['movement']['direction_change_frequency']) # Use imported TILE_SIZE
                 # Interaction check is now called within sim.update, remove explicit call here
             #   sim._check_interactions(sims, logger, current_sim_time) # Removed redundant call
             weather.update(dt)
             city.update(dt) # Update city state (currently does nothing)
+
+            # --- Poll for Ollama Thought Results ---
+            while True:
+                result = ollama_client.check_for_thought_results()
+                if result is None:
+                    break # No more results in the queue for now
+                sim_id, thought_text = result
+                target_sim = sims_dict.get(sim_id)
+                if target_sim and thought_text:
+                    target_sim.current_thought = thought_text
+                    target_sim.thought_timer = THOUGHT_DURATION # Use imported constant
+                    print(f"Applied thought to Sim {sim_id}: {thought_text[:50]}...") # Log application
 
         # --- Drawing --- (Always draw, even when paused)
         screen.fill(weather.get_current_color()) # Use weather color for background
@@ -135,7 +153,7 @@ def main():
         city.draw(screen)
 
         # Draw simulation elements (Sims)
-        for sim in sims:
+        for sim in sims_dict.values(): # Iterate over dict values
             sim.draw(screen)
         weather.draw_effects(screen) # Draw weather effects over sims
 
@@ -169,8 +187,8 @@ def main():
             log_surface = log_font.render(entry_text, True, (200, 200, 200))
             screen.blit(log_surface, (log_x, log_y))
             log_y -= 15 # Move up for next line
-        pygame.display.flip()  # Update the full display Surface to the screen
-        for sim in sims:
+        pygame.display.flip() # Update the full display Surface to the screen
+        for sim in sims_dict.values(): # Iterate over dict values
             sim.can_talk = True
 
 
