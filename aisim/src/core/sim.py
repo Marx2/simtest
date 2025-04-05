@@ -178,13 +178,14 @@ def _generate_personality(attributes_data):
 
     return personality
 
-def _format_personality_for_prompt(personality: Dict) -> str:
+def _format_personality_for_prompt(personality: Dict, sex: str) -> str:
     """Formats the personality dictionary into a readable string for the LLM prompt."""
     # ... (Insert the _format_personality_for_prompt function code here) ...
     if not personality:
         return "No specific personality details available."
 
-    lines = ["Your Personality:"]
+    lines = [f"Your Sex: {sex}"] # Add sex at the beginning
+    lines.append("Your Personality:")
     if traits := personality.get("personality_traits"):
         lines.append(f"- Traits: {', '.join(traits)}")
     if motivation := personality.get("motivation"):
@@ -258,7 +259,7 @@ class Sim:
         self.target = None
         # --- Personality ---
         self.personality = _generate_personality(ATTRIBUTES_DATA) # Keep the dictionary
-        self.personality_description = _format_personality_for_prompt(self.personality) # Pre-calculate description string
+        self.personality_description = _format_personality_for_prompt(self.personality, self.sex) # Pre-calculate description string, passing sex
         # --- End Personality ---
         self.memory = []  # List to store significant events or interactions
         self.ollama_client = ollama_client
@@ -383,7 +384,7 @@ class Sim:
             return  # Stay blocked
 
         self.block_timer = 0.0  # Reset timer
-        print(f"direction_change_frequency: {direction_change_frequency}")
+        # print(f"direction_change_frequency: {direction_change_frequency}")
         change_direction(self, city, direction_change_frequency)
 
     def _find_sim_by_id(self, sim_id_to_find: any, all_sims: List['Sim']) -> Optional['Sim']:
