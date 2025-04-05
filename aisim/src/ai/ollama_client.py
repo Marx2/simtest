@@ -15,11 +15,15 @@ class OllamaClient:
         self.client = ollama.Client(host=self.config['ollama']['host'])
         self.model = self.config['ollama']['model']
         self.prompt_template = self.config['ollama']['default_prompt_template']
-        self.conversation_prompt_template = self.config['ollama'].get('conversation_prompt_template', self.prompt_template) # Fallback to default
+        self.conversation_prompt_template = self.config['ollama'].get('conversation_prompt_template', self.prompt_template) # Fallback to default if missing
         self.conversation_response_timeout = self.config['ollama'].get('conversation_response_timeout', 30.0) # Default 30s
         self.results_queue = queue.Queue() # Queue to store results from threads
         self.active_requests = set() # Keep track of active requests per Sim ID
         print(f"Ollama client initialized. Host: {self.config['ollama']['host']}, Model: {self.model}")
+        # Verify the conversation template has the required placeholders
+        if not all(k in self.conversation_prompt_template for k in ['{my_name}', '{other_name}', '{history}', '{personality_info}']):
+             print("Warning: conversation_prompt_template might be missing required placeholders ({my_name}, {other_name}, {history}, {personality_info})")
+
 
     def _load_config(self):
         """Loads the configuration from config.json."""
@@ -34,7 +38,7 @@ class OllamaClient:
                     "host": "http://localhost:11434",
                     "model": "deepseek-r1:7b",
                     "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble.",
-                    "conversation_prompt_template": "You are {my_name}, talking to {other_name} in a life simulation. Continue the conversation naturally. Keep your response concise (1-2 sentences). \n\nConversation History:\n{history}\n\n{my_name}:",
+                    "conversation_prompt_template": "You are {my_name}, a character in a life simulation.\n{personality_info}\n\nYou are talking to {other_name}. Continue the conversation naturally based on your personality and the history. Keep your response concise (1-2 sentences).\n\nConversation History:\n{history}\n\n{my_name}:", # Default added here
                     "conversation_response_timeout": 30.0
                  }
             }
@@ -62,14 +66,16 @@ class OllamaClient:
             # print(f"Ollama worker finished for Sim {sim_id}. Active requests: {self.active_requests}") # Debug
 
 
-    def _generate_conversation_worker(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]]):
+    def _generate_conversation_worker(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]], personality_info: str):
         """Worker function to run Ollama conversation generation in a separate thread."""
         # Format history for the prompt
-        history_str = "\n".join([f"{msg['speaker']}: {msg['line']}" for msg in history])
+        history_str = "\n".join([f"{msg['speaker']}: {msg['line']}" for msg in history]) if history else "This is the start of the conversation."
+
         prompt = self.conversation_prompt_template.format(
             my_name=my_name,
             other_name=other_name,
-            history=history_str
+            history=history_str,
+            personality_info=personality_info # Use pre-formatted string
         )
         result = None
         try:
@@ -97,15 +103,15 @@ class OllamaClient:
         thread.start()
         return True
 
-    def request_conversation_response(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]]) -> bool:
-        """Requests a conversation response asynchronously. Returns True if request started, False otherwise."""
+    def request_conversation_response(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]], personality_info: str) -> bool:
+        """Requests a conversation response asynchronously, including personality description. Returns True if request started, False otherwise."""
         if sim_id in self.active_requests:
             # print(f"Ollama request already active for Sim {sim_id}. Ignoring new conversation request.") # Debug
             return False
 
         # print(f"Starting Ollama conversation worker thread for Sim {sim_id}") # Debug
         self.active_requests.add(sim_id)
-        thread = threading.Thread(target=self._generate_conversation_worker, args=(sim_id, my_name, other_name, history), daemon=True)
+        thread = threading.Thread(target=self._generate_conversation_worker, args=(sim_id, my_name, other_name, history, personality_info), daemon=True)
         thread.start()
         return True
 

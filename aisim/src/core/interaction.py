@@ -96,7 +96,8 @@ def check_interactions(self, all_sims, logger, current_time):
                     first_speaker.sim_id,
                     first_speaker.first_name,
                     second_speaker.first_name,
-                    first_speaker.conversation_history # Initially empty
+                    first_speaker.conversation_history, # Initially empty
+                    first_speaker.personality # Pass personality
                 )
                 if request_sent:
                     first_speaker.waiting_for_ollama_response = True

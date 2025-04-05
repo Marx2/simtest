@@ -1,0 +1,68 @@
+{
+    "personality_traits": {
+      "positive": [
+        "Outgoing", "Optimistic", "Ambitious", "Kind", "Creative",
+        "Honest", "Loyal", "Calm", "Curious", "Confident", "Empathetic", "Adventurous", "Independent"
+      ],
+      "negative": [
+        "Shy", "Cynical", "Lazy", "Self-centered", "Rigid",
+        "Manipulative", "Fickle", "Hot-headed", "Apathetic", "Insecure", "Cold", "Fearful", "Needy"
+      ]
+    },
+    "life_motivations": [
+      "Family-Oriented", "Career-Focused", "Fame-Seeker", "Pleasure-Seeker",
+      "Knowledge-Driven", "Power-Hungry", "Freedom Lover", "Minimalist",
+      "Materialist", "Legacy-Oriented", "Spiritual", "Hedonistic"
+    ],
+    "hobbies": [
+      "Sports", "Cooking", "Fashion", "Art", "Writing", "Music", "Gaming",
+      "Technology", "Cars", "Nature", "Gardening", "DIY", "Partying",
+      "Reading", "Politics", "Volunteering", "Traveling", "Collecting", "Pets"
+    ],
+    "emotional_profile": {
+      "anxiety_level": ["Low", "Moderate", "High"],
+      "emotional_intelligence": ["Low", "Moderate", "High"],
+      "stress_tolerance": ["Low", "Moderate", "High"],
+      "attachment_style": ["Secure", "Anxious", "Avoidant", "Disorganized"],
+      "risk_tolerance": ["Risk-Averse", "Balanced", "Risk-Seeking"],
+      "impulse_control": ["Low", "Moderate", "High"],
+      "social_energy": ["Introvert", "Ambivert", "Extrovert"],
+      "trauma_history": ["None", "Mild", "Moderate", "Severe"]
+    },
+    "romantic_profile": {
+      "sexual_orientation": ["Straight", "Gay", "Lesbian", "Bisexual", "Pansexual", "Asexual"],
+      "libido": ["Low", "Medium", "High"],
+      "kinkiness": ["Low", "Moderate", "High"],
+      "relationship_type": ["Monogamous", "Polyamorous"],
+      "love_language": ["Words", "Acts", "Gifts", "Time", "Touch"],
+      "relationship_goal": ["Short-term", "Long-term", "Avoidant", "Casual"]
+    },
+    "cultural_background": {
+      "ethnicity": ["White", "Black", "Hispanic", "Asian", "Mixed", "Middle Eastern", "Indigenous", "Other"],
+      "religion": ["Christian", "Muslim", "Jewish", "Hindu", "Buddhist", "Spiritual", "Atheist", "Agnostic", "Other"],
+      "socioeconomic_status": ["Poor", "Working-Class", "Middle-Class", "Upper-Class", "Wealthy"],
+      "education_level": ["None", "Primary", "High School", "College", "Graduate", "PhD"],
+      "nationality": ["American", "British", "German", "French", "Japanese", "Chinese", "Indian", "Brazilian", "Other"],
+      "political_leaning": ["Conservative", "Liberal", "Centrist", "Apolitical", "Radical"]
+    },
+    "career_style": [
+      "Workaholic", "Balanced", "Underachiever", "Entrepreneurial",
+      "Team Player", "Lone Wolf", "Authority-Respecting", "Rebellious",
+      "Passion-Focused", "Profit-Focused"
+    ],
+    "lifestyle_habits": {
+      "sleep_schedule": ["Early Riser", "Night Owl"],
+      "cleanliness": ["Clean", "Moderate", "Messy"],
+      "health_focus": ["Unhealthy", "Moderate", "Health Conscious"],
+      "planning_style": ["Planner", "Spontaneous"],
+      "tech_use": ["Minimalist", "Average", "Tech Addict"],
+      "alcohol_use": ["Never", "Occasionally", "Frequently"],
+      "substance_use": ["None", "Experimental", "Regular", "Addictive"]
+    },
+    "quirks_and_flaws": [
+      "Jealous", "Passive-Aggressive", "Control Freak", "Overthinker",
+      "Chronic Liar", "Drama Seeker", "Procrastinator", "Socially Awkward",
+      "Clingy", "Pessimist", "Perfectionist", "Easily Bored", "Hypochondriac"
+    ]
+  }
+  

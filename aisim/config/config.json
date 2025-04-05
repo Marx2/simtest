@@ -3,8 +3,8 @@
     "host": "http://localhost:11434",
     "model": "phi4",
     "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble.",
-    "conversation_prompt_template": "You are {my_name}, talking to {other_name} in a life simulation. Continue the conversation naturally. Keep your response concise (1-2 sentences). \n\nConversation History:\n{history}\n\n{my_name}:",
-    "conversation_max_turns": 6,
+    "conversation_prompt_template": "You are {my_name}, a character in a life simulation.\n{personality_info}\n\nYou are talking to {other_name}. Continue the conversation naturally based on your personality and the history. Keep your response concise (1-2 sentences).\n\nConversation History:\n{history}\n\n{my_name}:",
+    "conversation_max_turns": 4,
     "conversation_response_timeout": 30.0
   },
   "simulation": {
