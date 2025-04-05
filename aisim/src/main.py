@@ -134,17 +134,21 @@ def main():
             weather.update(dt)
             city.update(dt) # Update city state (currently does nothing)
 
-            # --- Poll for Ollama Thought Results ---
+            # --- Poll for Ollama Results (Thoughts & Conversation Responses) ---
             while True:
                 result = ollama_client.check_for_thought_results()
                 if result is None:
                     break # No more results in the queue for now
-                sim_id, thought_text = result
+
+                sim_id, response_text = result
                 target_sim = sims_dict.get(sim_id)
-                if target_sim and thought_text:
-                    target_sim.current_thought = thought_text
-                    target_sim.thought_timer = THOUGHT_DURATION # Use imported constant
-                    print(f"Applied thought to Sim {sim_id}: {thought_text[:50]}...") # Log application
+
+                if target_sim and response_text:
+                    # Pass the response to the Sim's handler method
+                    target_sim.handle_ollama_response(response_text, current_sim_time, all_sims_list)
+                elif not target_sim:
+                     print(f"Warning: Received Ollama result for unknown Sim ID: {sim_id}")
+                # The old direct setting of current_thought/thought_timer is now handled within handle_ollama_response
 
         # --- Drawing --- (Always draw, even when paused)
         screen.fill(weather.get_current_color()) # Use weather color for background

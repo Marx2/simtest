@@ -2,10 +2,13 @@
   "ollama": {
     "host": "http://localhost:11434",
     "model": "phi4",
-    "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble."
+    "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble.",
+    "conversation_prompt_template": "You are {my_name}, talking to {other_name} in a life simulation. Continue the conversation naturally. Keep your response concise (1-2 sentences). \n\nConversation History:\n{history}\n\n{my_name}:",
+    "conversation_max_turns": 6,
+    "conversation_response_timeout": 30.0
   },
   "simulation": {
-    "initial_sims": 10,
+    "initial_sims": 2,
     "fps": 60,
     "enable_talking": true,
     "weather_transition_time": 15.0,

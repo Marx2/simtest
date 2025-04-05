@@ -77,12 +77,12 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
     sim.x = max(0, min(sim.x, city.width - 1))
     sim.y = max(0, min(sim.y, city.height - 1))
 
-    if not sim.path:
+    # Only assign a new path if not interacting and no path exists
+    if not sim.path and not sim.is_interacting:
         sim.path = get_path((sim.x, sim.y), (random.randint(0, city.width), random.randint(0, city.height)), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
         # print(f"Sim {sim.sim_id}: New path assigned in movement_update: {sim.path}") # Log path assignment
         if not sim.path:  # Still no path (e.g., couldn't find one)
             return # Wait until next update to try again
-
     # Follow the current path
     if sim.path and sim.path_index < len(sim.path):
         target_x, target_y = sim.path[sim.path_index]

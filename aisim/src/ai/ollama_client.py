@@ -3,7 +3,7 @@ import json
 import os
 import threading # Added
 import queue # Added
-from typing import Optional, Tuple # Added for type hinting
+from typing import Optional, Tuple, List, Dict # Added for type hinting
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
 class OllamaClient:
@@ -15,8 +15,10 @@ class OllamaClient:
         self.client = ollama.Client(host=self.config['ollama']['host'])
         self.model = self.config['ollama']['model']
         self.prompt_template = self.config['ollama']['default_prompt_template']
-        self.results_queue = queue.Queue() # Added: Queue to store results from threads
-        self.active_requests = set() # Added: Keep track of active requests per Sim ID
+        self.conversation_prompt_template = self.config['ollama'].get('conversation_prompt_template', self.prompt_template) # Fallback to default
+        self.conversation_response_timeout = self.config['ollama'].get('conversation_response_timeout', 30.0) # Default 30s
+        self.results_queue = queue.Queue() # Queue to store results from threads
+        self.active_requests = set() # Keep track of active requests per Sim ID
         print(f"Ollama client initialized. Host: {self.config['ollama']['host']}, Model: {self.model}")
 
     def _load_config(self):
@@ -31,8 +33,10 @@ class OllamaClient:
                 "ollama": {
                     "host": "http://localhost:11434",
                     "model": "deepseek-r1:7b",
-                    "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble."
-                }
+                    "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble.",
+                    "conversation_prompt_template": "You are {my_name}, talking to {other_name} in a life simulation. Continue the conversation naturally. Keep your response concise (1-2 sentences). \n\nConversation History:\n{history}\n\n{my_name}:",
+                    "conversation_response_timeout": 30.0
+                 }
             }
         except json.JSONDecodeError:
             print(f"Error: Could not decode JSON from {CONFIG_PATH}")
@@ -58,16 +62,50 @@ class OllamaClient:
             # print(f"Ollama worker finished for Sim {sim_id}. Active requests: {self.active_requests}") # Debug
 
 
-    def request_thought_generation(self, sim_id, situation_description):
-        """Requests thought generation asynchronously. Returns True if request started, False otherwise."""
-        # Only start a new request if one isn't already active for this Sim
-        if sim_id in self.active_requests:
-            # print(f"Ollama request already active for Sim {sim_id}. Ignoring new request.") # Debug
-            return False
+    def _generate_conversation_worker(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]]):
+        """Worker function to run Ollama conversation generation in a separate thread."""
+        # Format history for the prompt
+        history_str = "\n".join([f"{msg['speaker']}: {msg['line']}" for msg in history])
+        prompt = self.conversation_prompt_template.format(
+            my_name=my_name,
+            other_name=other_name,
+            history=history_str
+        )
+        result = None
+        try:
+            # Note: The ollama library itself doesn't have an explicit timeout for generate.
+            # The timeout logic will need to be handled in the main loop based on self.conversation_response_timeout
+            response = self.client.generate(model=self.model, prompt=prompt, stream=False)
+            result = response.get('response', '').strip()
+            # Basic cleanup: remove potential self-prompting if the model includes it
+            if result.startswith(f"{my_name}:"):
+                result = result[len(f"{my_name}:"):].strip()
+        except Exception as e:
+            print(f"Error communicating with Ollama for Sim {sim_id} (conversation): {e}")
+            result = f"({self.model} unavailable)" # Placeholder thought on error
+        finally:
+            self.results_queue.put((sim_id, result))
+            self.active_requests.discard(sim_id)
 
-        # print(f"Starting Ollama worker thread for Sim {sim_id}") # Debug
+
+    def request_thought_generation(self, sim_id: any, situation_description: str) -> bool:
+        """Requests thought generation asynchronously. Returns True if request started, False otherwise."""
+        if sim_id in self.active_requests:
+            return False
         self.active_requests.add(sim_id)
         thread = threading.Thread(target=self._generate_worker, args=(sim_id, situation_description), daemon=True)
+        thread.start()
+        return True
+
+    def request_conversation_response(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]]) -> bool:
+        """Requests a conversation response asynchronously. Returns True if request started, False otherwise."""
+        if sim_id in self.active_requests:
+            # print(f"Ollama request already active for Sim {sim_id}. Ignoring new conversation request.") # Debug
+            return False
+
+        # print(f"Starting Ollama conversation worker thread for Sim {sim_id}") # Debug
+        self.active_requests.add(sim_id)
+        thread = threading.Thread(target=self._generate_conversation_worker, args=(sim_id, my_name, other_name, history), daemon=True)
         thread.start()
         return True
 
@@ -92,36 +130,3 @@ class OllamaClient:
         except Exception as e:
             print(f"Error communicating with Ollama (sync): {e}")
             return f"({self.model} unavailable)"
-
-# Example usage (for testing)
-if __name__ == '__main__':
-    client = OllamaClient()
-
-    # Test synchronous call
-    thought_sync = client.generate_thought_sync("Just arrived at the park on a sunny day.")
-    print(f"Generated thought (sync): {thought_sync}")
-
-    # Test asynchronous call
-    print("\nRequesting async thoughts...")
-    client.request_thought_generation("sim1", "Walking in the rain.")
-    client.request_thought_generation("sim2", "Seeing a friend across the street.")
-    client.request_thought_generation("sim1", "This should be ignored (already active).") # Test duplicate request
-
-    print("Checking for results...")
-    import time
-    results_received = 0
-    start_time = time.time()
-    while results_received < 2 and time.time() - start_time < 10: # Wait up to 10 seconds
-        result = client.check_for_thought_results()
-        if result:
-            sim_id, thought = result
-            print(f"Received async thought for {sim_id}: {thought}")
-            results_received += 1
-        else:
-            print(".", end="", flush=True)
-            time.sleep(0.5)
-
-    if results_received < 2:
-        print("\nDid not receive all results in time.")
-    else:
-        print("\nReceived all expected results.")

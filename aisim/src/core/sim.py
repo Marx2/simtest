@@ -4,6 +4,7 @@ import math
 import uuid
 import textwrap
 import os
+from typing import List, Dict, Optional # Add typing
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import check_interactions
 from aisim.src.core.city import TILE_SIZE  # Import TILE_SIZE constant
@@ -97,13 +98,20 @@ class Sim:
         self.mood = 0.0  # -1.0 (Sad) to 1.0 (Happy)
         self.last_interaction_time = 0.0  # Time of last interaction
         self.enable_talking = enable_talking
-        self.can_talk = False  # Flag to control thought generation
+        self.can_talk = False  # Flag to control thought generation (might be deprecated by conversation logic)
         # Animation attributes
         self.animation_frame = 0
         self.animation_timer = 0.0
         self.animation_speed = 0.15 # Time between frames in seconds
+        # Conversation attributes
+        self.conversation_history: Optional[List[Dict[str, str]]] = None
+        self.is_my_turn_to_speak: bool = False
+        self.waiting_for_ollama_response: bool = False
+        self.conversation_partner_id: Optional[any] = None # Store partner ID
+        self.conversation_turns: int = 0
+        self.conversation_last_response_time: float = 0.0
     # REMOVED DUPLICATE _load_sprite method
-    def update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency): # Add tile_size
+    def update(self, dt, city, weather_state, all_sims: List['Sim'], logger, current_time, tile_size, direction_change_frequency): # Add tile_size and type hint
         """Updates the Sim's state, following a path if available, and logs data."""
         self.tile_size = tile_size
         self.is_blocked = False # Reset blocked status
@@ -118,15 +126,43 @@ class Sim:
             return
         self.last_update_time = current_time
         # print(f"Sim {self.sim_id}: update called at start, is_interacting={self.is_interacting}, interaction_timer={self.interaction_timer}, path={self.path}, target={self.target}, is_interacting={self.is_interacting}")
+        # --- Conversation Logic ---
         if self.is_interacting:
-            self.interaction_timer += dt
-            # print(f"Sim {self.sim_id}: is_interacting=True, interaction_timer={self.interaction_timer}")
-            # print(f"Sim {self.sim_id}: is_interacting=True, interaction_timer={self.interaction_timer}")
-            if self.interaction_timer > random.uniform(3, 20):
-                self.is_interacting = False
-                self.talking_with = None
-                # print(f"Sim {self.sim_id}: interaction timer expired, is_interacting set to False")
-                return
+            self.interaction_timer += dt # Keep track of total interaction time if needed
+
+            # Check for conversation timeout (if waiting too long for a response)
+            if self.waiting_for_ollama_response and (current_time - self.conversation_last_response_time > self.ollama_client.conversation_response_timeout):
+                print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} timed out.")
+                self._end_interaction(all_sims)
+                return # Stop further processing for this sim in this update
+
+            # Check for max turns reached
+            if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
+                 print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns.")
+                 self._end_interaction(all_sims)
+                 return # Stop further processing
+
+            # If it's my turn and I'm not waiting for a response, request one
+            if self.is_my_turn_to_speak and not self.waiting_for_ollama_response:
+                partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
+                if partner:
+                    print(f"Sim {self.sim_id}: Requesting conversation response (Turn {self.conversation_turns}). History: {self.conversation_history}")
+                    request_sent = self.ollama_client.request_conversation_response(
+                        self.sim_id,
+                        self.first_name,
+                        partner.first_name,
+                        self.conversation_history
+                    )
+                    if request_sent:
+                        self.waiting_for_ollama_response = True
+                        self.conversation_last_response_time = current_time # Reset timeout timer
+                    else:
+                        print(f"Sim {self.sim_id}: Failed to send conversation request (maybe Ollama busy?).")
+                        # Optionally handle failure, e.g., end interaction after a few failed attempts
+                else:
+                     print(f"Sim {self.sim_id}: ERROR - Conversation partner {self.conversation_partner_id} not found!")
+                     self._end_interaction(all_sims) # End interaction if partner is lost
+                     return
 
         # if logger:
         #     print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}")
@@ -179,20 +215,93 @@ class Sim:
         print(f"direction_change_frequency: {direction_change_frequency}")
         change_direction(self, city, direction_change_frequency)
 
+    def _find_sim_by_id(self, sim_id_to_find: any, all_sims: List['Sim']) -> Optional['Sim']:
+        """Helper to find a Sim object by its ID."""
+        for sim in all_sims:
+            if sim.sim_id == sim_id_to_find:
+                return sim
+        return None
+
+    def _end_interaction(self, all_sims: List['Sim']):
+        """Cleans up state at the end of an interaction."""
+        print(f"Sim {self.sim_id}: Ending interaction with {self.conversation_partner_id}")
+        partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
+        if partner and partner.is_interacting:
+             partner.is_interacting = False
+             partner.talking_with = None
+             partner.conversation_history = None
+             partner.is_my_turn_to_speak = False
+             partner.waiting_for_ollama_response = False
+             partner.conversation_partner_id = None
+             partner.conversation_turns = 0
+             partner.interaction_timer = 0.0 # Reset partner timer too
+
+        self.is_interacting = False
+        self.talking_with = None # Keep talking_with for compatibility? Maybe remove.
+        self.conversation_history = None
+        self.is_my_turn_to_speak = False
+        self.waiting_for_ollama_response = False
+        self.conversation_partner_id = None
+        self.conversation_turns = 0
+        self.interaction_timer = 0.0 # Reset timer
+
+
+    def handle_ollama_response(self, response_text: str, current_time: float, all_sims: List['Sim']):
+        """Handles a response received from Ollama."""
+        print(f"Sim {self.sim_id}: Received Ollama response: '{response_text}'")
+        self.waiting_for_ollama_response = False # No longer waiting
+
+        if self.is_interacting and self.conversation_partner_id is not None:
+            # --- Handle Conversation Response ---
+            self.current_thought = response_text # Display the response
+            self.thought_timer = THOUGHT_DURATION # Show bubble
+
+            # Add to history
+            new_entry = {"speaker": self.first_name, "line": response_text}
+            if self.conversation_history is None: self.conversation_history = [] # Should be initialized, but safety check
+            self.conversation_history.append(new_entry)
+
+            # Update partner
+            partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
+            if partner:
+                if partner.conversation_history is None: partner.conversation_history = []
+                partner.conversation_history.append(new_entry) # Share history
+                partner.is_my_turn_to_speak = True # It's partner's turn now
+                partner.waiting_for_ollama_response = False # Partner isn't waiting yet
+                partner.conversation_last_response_time = current_time # Update partner's timer too, maybe? Or just initiator? Let's update both.
+                print(f"Sim {self.sim_id}: Passed turn to {partner.sim_id}")
+            else:
+                print(f"Sim {self.sim_id}: ERROR - Partner {self.conversation_partner_id} not found during response handling!")
+                self._end_interaction(all_sims) # End if partner vanished
+
+            # Update self
+            self.is_my_turn_to_speak = False # Not my turn anymore
+            self.conversation_turns += 1 # Increment turn counter *after* speaking
+            self.conversation_last_response_time = current_time # Reset timeout timer
+
+            # Check if max turns reached *after* this turn
+            if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
+                 print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns after response.")
+                 self._end_interaction(all_sims)
+
+        else:
+            # --- Handle Regular Thought ---
+            self.current_thought = response_text
+            self.thought_timer = THOUGHT_DURATION
+
+
     def _generate_thought(self, situation_description):
-        """Requests thought generation asynchronously using Ollama."""
-        # print(f"Sim generating thought for: {situation_description}") # Optional log
-        if self.enable_talking and self.can_talk:
-            print(f"Sim {self.sim_id}: Requesting thought generation for: {situation_description}, enable_talking={self.enable_talking}, can_talk={self.can_talk}")
-            # Request generation, but don't wait for the result here.
-            # The main loop will poll the OllamaClient for results.
+        """Requests non-conversational thought generation asynchronously using Ollama."""
+        # Only generate if talking is enabled AND not currently in a conversation
+        if self.enable_talking and not self.is_interacting:
+            print(f"Sim {self.sim_id}: Requesting standard thought for: {situation_description}")
             request_sent = self.ollama_client.request_thought_generation(self.sim_id, situation_description)
             if not request_sent:
-                print(f"Sim {self.sim_id}: Thought generation request ignored (already active).")
-            else:
-                print(f"Sim {self.sim_id}: Thought generation requested.")
-        else:
-            print(f"Sim {self.sim_id} talking blocked")
+                print(f"Sim {self.sim_id}: Standard thought generation request ignored (already active).")
+            # else:
+                # print(f"Sim {self.sim_id}: Standard thought generation requested.")
+        # else:
+            # print(f"Sim {self.sim_id} talking blocked (interacting or disabled)")
 
     def update_animation(self, dt):
         """Updates the animation frame based on elapsed time."""
@@ -256,7 +365,7 @@ class Sim:
            return character_name, sprite_sheet
        except Exception as e:
            print(f"Error loading sprite sheet: {e}")
-           return None, None
+           return "Unknown_Sim", None # Return a default name if loading fails
     def draw(self, screen):
         """Draws the Sim and its current thought on the screen."""
         sim_pos = (int(self.x), int(self.y))
