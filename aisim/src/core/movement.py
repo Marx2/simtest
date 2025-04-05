@@ -100,7 +100,7 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
                 sim.path_index = 0
                 # Generate thought upon arrival
                 situation = f"arrived at location ({int(sim.x)}, {int(sim.y)}) on a {weather_state} day"
-                sim._generate_thought(situation)
+                # sim._generate_thought(situation)
                 sim.mood = min(1.0, sim.mood + 0.1) # Mood boost for reaching destination
         else: # Move towards waypoint
             # Normalize direction vector
@@ -185,15 +185,15 @@ def change_direction(sim, city, direction_change_frequency):
         if sim.path:
             sim.path_index = 0
             sim.target = sim.path[sim.path_index]
-            print(f"Sim {sim.sim_id}: Changed direction to {new_direction}")
+            # print(f"Sim {sim.sim_id}: Changed direction to {new_direction}")
     else:
         print(f"Sim {sim.sim_id}: No path found in new direction {new_direction}")
 
 def get_available_directions(sim, city):
     """Gets available directions for the Sim to move in."""
     directions = []
-    print(f"City object: {city}")
-    print(f"City object attributes: {city.__dict__}")
+    # print(f"City object: {city}")
+    # print(f"City object attributes: {city.__dict__}")
     current_node = get_node_from_coords(sim.x, sim.y, city.width, city.height)
     if current_node:
         neighbors = list(city.graph.neighbors(current_node))

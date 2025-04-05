@@ -8,7 +8,7 @@
     "conversation_response_timeout": 30.0
   },
   "simulation": {
-    "initial_sims": 2,
+    "initial_sims": 5,
     "fps": 60,
     "enable_talking": true,
     "weather_transition_time": 15.0,
