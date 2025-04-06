@@ -56,7 +56,7 @@ def main():
     ui_font = pygame.font.SysFont(None, 24) # Font for UI text
     log_font = pygame.font.SysFont(None, 18) # Smaller font for event log
     # Create Simulation Components
-    weather = Weather(sim_config) # Pass simulation config
+    weather = Weather(config, SCREEN_WIDTH, SCREEN_HEIGHT) # Pass FULL config and screen dimensions
     city = City(SCREEN_WIDTH, SCREEN_HEIGHT)
     enable_talking = config['simulation']['enable_talking']
 
@@ -168,6 +168,21 @@ def main():
             status_text = f"Speed: {time_scale}x"
         status_surface = ui_font.render(status_text, True, (255, 255, 255))
         screen.blit(status_surface, (10, 10)) # Top-left corner
+
+        # Draw Weather Status (Top-right)
+        weather_text = f"Weather: {weather.current_state}"
+        weather_surface = ui_font.render(weather_text, True, (255, 255, 255))
+        weather_rect = weather_surface.get_rect(topright=(SCREEN_WIDTH - 10, 10))
+        screen.blit(weather_surface, weather_rect)
+
+        # Draw Weather Countdown Timer (Below Weather Status)
+        if weather.weather_config.get('enable_weather_changes', False): # Only show if changes are enabled
+            remaining_time = max(0, weather.change_frequency - weather.time_since_last_change)
+            countdown_text = f"Next change in: {int(remaining_time)}s" # Cast to int
+            countdown_surface = ui_font.render(countdown_text, True, (220, 220, 220)) # Slightly dimmer white
+            countdown_rect = countdown_surface.get_rect(topright=(SCREEN_WIDTH - 10, weather_rect.bottom + 5)) # Position below weather text
+            screen.blit(countdown_surface, countdown_rect)
+
 
         # Draw Event Log for selected Sim
         if selected_sim:

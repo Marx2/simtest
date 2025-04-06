@@ -18,6 +18,7 @@
     "direction_change_frequency": 5.0
   },
   "weather": {
-    "enable_weather_changes": true
+    "enable_weather_changes": true,
+    "weather_change_frequency": 60.0
   }
 }
