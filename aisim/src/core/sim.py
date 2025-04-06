@@ -528,6 +528,26 @@ class Sim:
 
         return sprite
 
+    def get_portrait(self):
+        """Returns the front-facing, non-animated portrait sprite."""
+        if not self.sprite_sheet:
+            return None
+
+        width = SPRITE_WIDTH
+        height = SPRITE_HEIGHT
+        row = 0  # Front-facing row
+        col = 0  # First animation frame
+
+        # Calculate the position of the sub-sprite in the sprite sheet
+        x = col * width
+        y = row * height
+
+        # Extract the sub-sprite
+        portrait = pygame.Surface((width, height), pygame.SRCALPHA)
+        portrait.blit(self.sprite_sheet, (0, 0), (x, y, width, height))
+
+        return portrait
+
 
     def _load_sprite_sheet(self):
        """Loads a random Sim's sprite sheet from the character sprites directory."""
