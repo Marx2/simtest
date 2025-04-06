@@ -12,12 +12,12 @@
     "fps": 60,
     "enable_talking": true,
     "weather_transition_time": 15.0,
-    "ignore_interaction_time": 5.0
+    "ignore_interaction_time": 15.0
   },
   "movement": {
     "direction_change_frequency": 5.0
   },
   "weather": {
-    "enable_weather_changes": false
+    "enable_weather_changes": true
   }
 }
