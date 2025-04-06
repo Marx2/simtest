@@ -24,6 +24,7 @@ class City:
         self._load_tilesets()
         self._create_tile_map() # Create a map of which tile to draw where
         self.sims = [] # Initialize sims list
+        self.active_conversation_partners = set() # Track sims currently talking
 
     def _load_tilesets(self):
         """Loads the required tileset images."""
@@ -109,6 +110,7 @@ class City:
         """Creates a NetworkX graph representing the walkable grid."""
         G = nx.Graph()
         half_tile = TILE_SIZE / 2
+        print(f"City grid_width: {self.grid_width}, grid_height: {self.grid_height}")
         for r in range(self.grid_height):
             for c in range(self.grid_width):
                 node_id = (c, r) # Use grid coords as node ID

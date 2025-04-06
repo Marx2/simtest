@@ -154,7 +154,8 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
          sim.mood = min(1.0, sim.mood + 0.003 * dt) # Slowly increase mood in good weather
 
     # --- Interaction Check ---
-    check_interactions(sim, all_sims, logger, current_time)
+    # Pass the city object to check_interactions
+    check_interactions(sim, all_sims, logger, current_time, city)
     # Clamp mood
     sim.mood = max(-1.0, min(sim.mood, 1.0))
     sim.mood = max(-1.0, min(sim.mood, 1.0))
@@ -163,7 +164,6 @@ def update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_si
     if logger:
         logger.log_mood(current_time, sim.sim_id, sim.mood)
 
-    
 def change_direction(sim, city, direction_change_frequency):
     """Changes the Sim's direction."""
     # Stop following the current path
@@ -196,6 +196,10 @@ def get_available_directions(sim, city):
     # print(f"City object attributes: {city.__dict__}")
     current_node = get_node_from_coords(sim.x, sim.y, city.width, city.height)
     if current_node:
+        print(f"Sim {sim.sim_id}: current_node = {current_node}")
+        if current_node not in city.graph.nodes:
+            print(f"Sim {sim.sim_id}: current_node {current_node} not in city.graph.nodes")
+            return []
         neighbors = list(city.graph.neighbors(current_node))
         for neighbor in neighbors:
             neighbor_coords = get_coords_from_node(neighbor, city.graph)

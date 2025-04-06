@@ -307,13 +307,13 @@ class Sim:
             # Check for conversation timeout (if waiting too long for a response)
             if self.waiting_for_ollama_response and (current_time - self.conversation_last_response_time > self.ollama_client.conversation_response_timeout):
                 print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} timed out.")
-                self._end_interaction(all_sims)
+                self._end_interaction(city, all_sims) # Pass city
                 return # Stop further processing for this sim in this update
 
             # Check for max turns reached
             if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
                  print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns.")
-                 self._end_interaction(all_sims)
+                 self._end_interaction(city, all_sims) # Pass city
                  return # Stop further processing
 
             # If it's my turn and I'm not waiting for a response, request one
@@ -336,14 +336,16 @@ class Sim:
                         # Optionally handle failure, e.g., end interaction after a few failed attempts
                 else:
                      print(f"Sim {self.sim_id}: ERROR - Conversation partner {self.conversation_partner_id} not found!")
-                     self._end_interaction(all_sims) # End interaction if partner is lost
+                     self._end_interaction(city, all_sims) # End interaction if partner is lost # Pass city
                      return
 
         # if logger:
         #     print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}")
         if not self.is_interacting:
             if not self.path:
-                self.path = get_path((self.x, self.y), (random.randint(0, city.width), random.randint(0, city.height)), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
+                target_x = random.randint(0, city.grid_width - 1) * TILE_SIZE
+                target_y = random.randint(0, city.grid_height - 1) * TILE_SIZE
+                self.path = get_path((self.x, self.y), (target_x, target_y), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
             if not self.path:  # Still no path (e.g., couldn't find one)
                 return
 
@@ -363,7 +365,8 @@ class Sim:
             self.mood = min(1.0, self.mood + 0.003 * dt)  # Slowly increase mood in good weather
 
         # --- Interaction Check ---
-        check_interactions(self, all_sims, logger, current_time)
+        # Pass the city object to check_interactions
+        check_interactions(self, all_sims, logger, current_time, city)
 
         # Clamp mood
         self.mood = max(-1.0, min(self.mood, 1.0))
@@ -399,88 +402,8 @@ class Sim:
                 return sim
         return None
 
-    def _end_interaction(self, all_sims: List['Sim']):
-        """Cleans up state at the end of an interaction."""
-        print(f"Sim {self.sim_id}: Ending interaction with {self.conversation_partner_id}")
-        partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-        if partner and partner.is_interacting:
-             partner.is_interacting = False
-             partner.talking_with = None
-             partner.conversation_history = None
-             partner.is_my_turn_to_speak = False
-             partner.waiting_for_ollama_response = False
-             partner.conversation_partner_id = None
-             partner.conversation_turns = 0
-             partner.interaction_timer = 0.0 # Reset partner timer too
-
-        self.is_interacting = False
-        self.talking_with = None # Keep talking_with for compatibility? Maybe remove.
-        self.conversation_history = None
-        self.is_my_turn_to_speak = False
-        self.waiting_for_ollama_response = False
-        self.conversation_partner_id = None
-        self.conversation_turns = 0
-        self.interaction_timer = 0.0 # Reset timer
 
 
-    def handle_ollama_response(self, response_text: str, current_time: float, all_sims: List['Sim']):
-        """Handles a response received from Ollama."""
-        print(f"Sim {self.sim_id}: Received Ollama response: '{response_text}'")
-        self.waiting_for_ollama_response = False # No longer waiting
-
-        if self.is_interacting and self.conversation_partner_id is not None:
-            # --- Handle Conversation Response ---
-            # Use the new attributes for conversation messages
-            self.conversation_message = response_text
-            self.conversation_message_timer = self.bubble_display_time # Use configured duration
-            # self.current_thought = None # Clear regular thought if starting conversation response? Optional.
-
-            # Add to history
-            new_entry = {"speaker": self.first_name, "line": response_text}
-            if self.conversation_history is None: self.conversation_history = [] # Should be initialized, but safety check
-            self.conversation_history.append(new_entry)
-
-            # Update partner
-            partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-            if partner:
-                if partner.conversation_history is None: partner.conversation_history = []
-                partner.conversation_history.append(new_entry) # Share history
-                partner.is_my_turn_to_speak = True # It's partner's turn now
-                partner.waiting_for_ollama_response = False # Partner isn't waiting yet
-                partner.conversation_last_response_time = current_time # Update partner's timer too, maybe? Or just initiator? Let's update both.
-                print(f"Sim {self.sim_id}: Passed turn to {partner.sim_id}")
-            else:
-                print(f"Sim {self.sim_id}: ERROR - Partner {self.conversation_partner_id} not found during response handling!")
-                self._end_interaction(all_sims) # End if partner vanished
-
-            # Update self
-            self.is_my_turn_to_speak = False # Not my turn anymore
-            self.conversation_turns += 1 # Increment turn counter *after* speaking
-            self.conversation_last_response_time = current_time # Reset timeout timer
-
-            # Check if max turns reached *after* this turn
-            if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
-                 print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns after response.")
-                 self._end_interaction(all_sims)
-
-        else:
-            # --- Handle Regular Thought ---
-            self.current_thought = response_text
-            self.thought_timer = THOUGHT_DURATION
-
-
-    def _generate_thought(self, situation_description):
-        """Requests non-conversational thought generation asynchronously using Ollama."""
-        # Only generate if talking is enabled AND not currently in a conversation
-        if self.enable_talking and not self.is_interacting:
-            print(f"Sim {self.sim_id}: Requesting standard thought for: {situation_description}")
-            request_sent = self.ollama_client.request_thought_generation(self.sim_id, situation_description)
-            if not request_sent:
-                print(f"Sim {self.sim_id}: Standard thought generation request ignored (already active).")
-            # else:
-                # print(f"Sim {self.sim_id}: Standard thought generation requested.")
-        # else:
-            # print(f"Sim {self.sim_id} talking blocked (interacting or disabled)")
 
     def update_animation(self, dt):
         """Updates the animation frame based on elapsed time."""
@@ -578,69 +501,47 @@ class Sim:
             sprite_rect = sprite.get_rect(center=sim_pos)
             screen.blit(sprite, sprite_rect)
         else:
-            # Fallback: Draw mood-colored circle
-            base_color = self.color  # Keep original random color base
-            mood_color = (0, 0, 0)
-            if self.mood < 0:  # Sad range (Blue tint)
-                lerp_t = abs(self.mood)  # 0 to 1
-                mood_color = (
-                    int(base_color[0] * (1 - lerp_t) + 0 * lerp_t),  # Less Red
-                    int(base_color[1] * (1 - lerp_t) + 0 * lerp_t),  # Less Green
-                    int(base_color[2] * (1 - lerp_t) + 255 * lerp_t)  # More Blue
-                )
-            else:  # Happy range (Yellow tint)
-                lerp_t = self.mood  # 0 to 1
-                mood_color = (
-                    int(base_color[0] * (1 - lerp_t) + 255 * lerp_t),  # More Red
-                    int(base_color[1] * (1 - lerp_t) + 255 * lerp_t),  # More Green
-                    int(base_color[2] * (1 - lerp_t) + 0 * lerp_t)   # Less Blue
-                )
-            # Clamp colors
-            mood_color = tuple(max(0, min(c, 255)) for c in mood_color)
-            pygame.draw.circle(screen, mood_color, sim_pos, SIM_RADIUS)
+            # Fallback: draw a simple circle
+            pygame.draw.circle(screen, self.color, sim_pos, SIM_RADIUS)
 
-        # Draw thought bubble if active
-        MAX_BUBBLE_WIDTH = 200  # Maximum width for thought bubbles
-        bubble_padding = 5
-        line_height = SIM_FONT.get_linesize()
-        
-        bubble_rect = pygame.Rect(0, 0, 0, 0) # Initialize bubble_rect
-
-        # --- Draw Thought/Conversation Bubbles ---
-        bubble_text = None
-        bubble_timer = 0.0
-
-        # Prioritize showing conversation message if available
+        # Draw thought bubble (if any)
         if self.conversation_message:
-            bubble_text = self.conversation_message
-            bubble_timer = self.conversation_message_timer
-        elif self.current_thought: # Fallback to regular thought
-            bubble_text = self.current_thought
-            bubble_timer = self.thought_timer
+            # print(f"Drawing conversation bubble for Sim {self.sim_id}: {self.conversation_message}")
+            self.conversation_message_timer += 1
+            if self.conversation_message_timer < self.bubble_display_time:
+                self._draw_thought_bubble(screen, self.conversation_message, sim_pos)
+            else:
+                self.conversation_message = None # Clear message after time
+                self.conversation_message_timer = 0.0
 
-        if bubble_text:
-            wrapped_lines = wrap_text(bubble_text, SIM_FONT, MAX_BUBBLE_WIDTH - 10) # Use bubble_text here
+        elif self.current_thought:
+            self._draw_thought_bubble(screen, self.current_thought, sim_pos)
 
-            # Calculate total height needed
-            total_height = len(wrapped_lines) * line_height
-            
-            # Find the widest line
-            max_line_width = max(SIM_FONT.size(line)[0] for line in wrapped_lines)
 
-            # Position above the Sim
-            bubble_rect = pygame.Rect(
-                sim_pos[0] - max_line_width / 2 - bubble_padding,
-                sim_pos[1] - SPRITE_HEIGHT - total_height - bubble_padding * 2,
-                max_line_width + bubble_padding * 2,
-                total_height + bubble_padding * 2
-            )
+    def _draw_thought_bubble(self, screen, text, sim_pos):
+        """Draws a thought bubble above the Sim."""
+        font = SIM_FONT
+        max_width = 150  # Maximum width of the thought bubble
+        lines = wrap_text(text, font, max_width)
 
-            # Draw background bubble
-            pygame.draw.rect(screen, THOUGHT_BG_COLOR, bubble_rect, border_radius=5)
+        # Calculate total height of the text block
+        line_height = font.get_linesize()
+        total_height = len(lines) * line_height
 
-            # Draw each line of text
-            y_offset = bubble_rect.y + bubble_padding
-            for line in wrapped_lines:
-                line_surface = SIM_FONT.render(line, True, THOUGHT_COLOR)
-                screen.blit(line_surface, (bubble_rect.x + bubble_padding, y_offset))
-                y_offset += line_height
+        # Calculate bubble dimensions
+        bubble_width = max(font.size(line)[0] for line in lines) + 20  # Add padding
+        bubble_height = total_height + 20
+        bubble_x = sim_pos[0] - bubble_width // 2
+        bubble_y = sim_pos[1] - bubble_height - 30  # Position above Sim
+
+        # Draw bubble background
+        bubble_rect = pygame.Rect(bubble_x, bubble_y, bubble_width, bubble_height)
+        pygame.draw.rect(screen, THOUGHT_BG_COLOR, bubble_rect, border_radius=5)
+
+        # Draw each line of text
+        text_y = bubble_y + 10  # Starting Y position for text
+        for line in lines:
+            text_surface = font.render(line, True, THOUGHT_COLOR)
+            text_rect = text_surface.get_rect(center=(sim_pos[0], text_y))
+            screen.blit(text_surface, text_rect)
+            text_y += line_height  # Move to the next line
