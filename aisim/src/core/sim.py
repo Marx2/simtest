@@ -355,7 +355,6 @@ class Sim:
             if self.thought_timer <= 0:
                 self.current_thought = None
 
-
         # Removed redundant path reset logic that was causing Sims to stop
 
         # --- Mood Update based on Weather ---
@@ -401,7 +400,6 @@ class Sim:
             if sim.sim_id == sim_id_to_find:
                 return sim
         return None
-
 
 
 
@@ -498,10 +496,9 @@ class Sim:
         # Draw Sim sprite or fallback circle
         if sprite:
             # Center the sprite on the sim's position
-            sprite_rect = sprite.get_rect(center=sim_pos)
-            screen.blit(sprite, sprite_rect)
+            screen.blit(sprite, (sim_pos[0] - SPRITE_WIDTH // 2, sim_pos[1] - SPRITE_HEIGHT // 2))
         else:
-            # Fallback: draw a simple circle
+            # Fallback: draw a colored circle
             pygame.draw.circle(screen, self.color, sim_pos, SIM_RADIUS)
 
         # Draw thought bubble (if any)

@@ -180,7 +180,7 @@ def change_direction(sim, city, direction_change_frequency):
             new_direction = random.choice(available_directions)
         else:
             new_direction = random.choice(available_directions)  # Choose again
-        print(f"Sim {sim.sim_id}: Available directions: {available_directions}, chosen direction: {new_direction}")
+        # print(f"Sim {sim.sim_id}: Available directions: {available_directions}, chosen direction: {new_direction}")
         # Update the Sim's path
         sim.path = get_path((sim.x, sim.y), new_direction, city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
         if sim.path:
@@ -217,5 +217,5 @@ def get_available_directions(sim, city):
                     break
                 if not is_interacting:
                     directions.append(neighbor_coords)
-    print(f"Sim {sim.sim_id}: Available directions: {directions}")
+    # print(f"Sim {sim.sim_id}: Available directions: {directions}")
     return directions
