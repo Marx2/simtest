@@ -5,7 +5,10 @@ logging.basicConfig(level=logging.DEBUG)
 import json
 import random # Import random
 
+__all__ = ['check_interactions', '_end_interaction'] # Explicitly export functions
+
 INTERACTION_DISTANCE = 40  # Max distance for interaction (pixels)
+THOUGHT_DURATION = 5.0  # Seconds to display thought bubble
 
 def check_interactions(self, all_sims, logger, current_time, city): # Add city parameter
     """Checks for and handles interactions with nearby Sims, logging them."""
@@ -143,8 +146,8 @@ def check_interactions(self, all_sims, logger, current_time, city): # Add city p
                     print(f"Sim {first_speaker.sim_id}: FAILED to send initial conversation request!")
                     # If the first request fails, maybe end the interaction immediately?
                     # Need to pass city to _end_interaction
-                    self._end_interaction(city, all_sims) # Assuming _end_interaction exists on Sim
-                    other_sim._end_interaction(city, all_sims) # End for both
+                    _end_interaction(self, city, all_sims) # Call as function with self parameter
+                    _end_interaction(other_sim, city, all_sims) # Call as function with other_sim parameter
 
             # If talking is disabled, or if the global lock prevented the conversation:
             # The sims might still be close enough to trigger the initial `if dist < INTERACTION_DISTANCE...`
@@ -185,94 +188,93 @@ def check_interactions(self, all_sims, logger, current_time, city): # Add city p
         self.mood = min(1.0, self.mood + 0.05)
         other_sim.mood = min(1.0, other_sim.mood + 0.05)
 
-    def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
-        logging.debug("List type hint is working")
-        """Cleans up state at the end of an interaction."""
-        print(f"Sim {self.sim_id}: Ending interaction with {self.conversation_partner_id}")
+def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
+    """Cleans up state at the end of an interaction."""
+    print(f"Sim {self.sim_id}: Ending interaction with {self.conversation_partner_id}")
+    partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
+    if partner and partner.is_interacting:
+            partner.is_interacting = False
+            partner.talking_with = None
+            partner.conversation_history = None
+            partner.is_my_turn_to_speak = False
+            partner.waiting_for_ollama_response = False
+            partner.conversation_partner_id = None
+            partner.conversation_turns = 0
+            partner.interaction_timer = 0.0 # Reset partner timer too
+            # Remove partner from active conversations
+            if partner.sim_id in city.active_conversation_partners:
+                city.active_conversation_partners.remove(partner.sim_id)
+                print(f"Sim {partner.sim_id} removed from active conversations.")
+
+    self.is_interacting = False
+    self.talking_with = None # Keep talking_with for compatibility? Maybe remove.
+    self.conversation_history = None
+    self.is_my_turn_to_speak = False
+    self.waiting_for_ollama_response = False
+    self.conversation_partner_id = None
+    self.conversation_turns = 0
+    self.interaction_timer = 0.0 # Reset timer
+
+    # Remove self from active conversations
+    if self.sim_id in city.active_conversation_partners:
+        city.active_conversation_partners.remove(self.sim_id)
+        print(f"Sim {self.sim_id} removed from active conversations.")
+
+def handle_ollama_response(self, response_text: str, current_time: float, all_sims: List['Sim']):
+    """Handles a response received from Ollama."""
+    print(f"Sim {self.sim_id}: Received Ollama response: '{response_text}'")
+    self.waiting_for_ollama_response = False # No longer waiting
+
+    if self.is_interacting and self.conversation_partner_id is not None:
+        # --- Handle Conversation Response ---
+        # Use the new attributes for conversation messages
+        self.conversation_message = response_text
+        self.conversation_message_timer = self.bubble_display_time # Use configured duration
+        # self.current_thought = None # Clear regular thought if starting conversation response? Optional.
+
+        # Add to history
+        new_entry = {"speaker": self.first_name, "line": response_text}
+        if self.conversation_history is None: self.conversation_history = [] # Should be initialized, but safety check
+        self.conversation_history.append(new_entry)
+
+        # Update partner
         partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-        if partner and partner.is_interacting:
-             partner.is_interacting = False
-             partner.talking_with = None
-             partner.conversation_history = None
-             partner.is_my_turn_to_speak = False
-             partner.waiting_for_ollama_response = False
-             partner.conversation_partner_id = None
-             partner.conversation_turns = 0
-             partner.interaction_timer = 0.0 # Reset partner timer too
-             # Remove partner from active conversations
-             if partner.sim_id in city.active_conversation_partners:
-                 city.active_conversation_partners.remove(partner.sim_id)
-                 print(f"Sim {partner.sim_id} removed from active conversations.")
-
-        self.is_interacting = False
-        self.talking_with = None # Keep talking_with for compatibility? Maybe remove.
-        self.conversation_history = None
-        self.is_my_turn_to_speak = False
-        self.waiting_for_ollama_response = False
-        self.conversation_partner_id = None
-        self.conversation_turns = 0
-        self.interaction_timer = 0.0 # Reset timer
-
-        # Remove self from active conversations
-        if self.sim_id in city.active_conversation_partners:
-            city.active_conversation_partners.remove(self.sim_id)
-            print(f"Sim {self.sim_id} removed from active conversations.")
-
-    def handle_ollama_response(self, response_text: str, current_time: float, all_sims: List['Sim']):
-        """Handles a response received from Ollama."""
-        print(f"Sim {self.sim_id}: Received Ollama response: '{response_text}'")
-        self.waiting_for_ollama_response = False # No longer waiting
-
-        if self.is_interacting and self.conversation_partner_id is not None:
-            # --- Handle Conversation Response ---
-            # Use the new attributes for conversation messages
-            self.conversation_message = response_text
-            self.conversation_message_timer = self.bubble_display_time # Use configured duration
-            # self.current_thought = None # Clear regular thought if starting conversation response? Optional.
-
-            # Add to history
-            new_entry = {"speaker": self.first_name, "line": response_text}
-            if self.conversation_history is None: self.conversation_history = [] # Should be initialized, but safety check
-            self.conversation_history.append(new_entry)
-
-            # Update partner
-            partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-            if partner:
-                if partner.conversation_history is None: partner.conversation_history = []
-                partner.conversation_history.append(new_entry) # Share history
-                partner.is_my_turn_to_speak = True # It's partner's turn now
-                partner.waiting_for_ollama_response = False # Partner isn't waiting yet
-                partner.conversation_last_response_time = current_time # Update partner's timer too, maybe? Or just initiator? Let's update both.
-                print(f"Sim {self.sim_id}: Passed turn to {partner.sim_id}")
-            else:
-                print(f"Sim {self.sim_id}: ERROR - Partner {self.conversation_partner_id} not found during response handling!")
-                self._end_interaction(city, all_sims) # End if partner vanished # Pass city
-
-            # Update self
-            self.is_my_turn_to_speak = False # Not my turn anymore
-            self.conversation_turns += 1 # Increment turn counter *after* speaking
-            self.conversation_last_response_time = current_time # Reset timeout timer
-
-            # Check if max turns reached *after* this turn
-            if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
-                 print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns after response.")
-                 self._end_interaction(city, all_sims) # Pass city
-
+        if partner:
+            if partner.conversation_history is None: partner.conversation_history = []
+            partner.conversation_history.append(new_entry) # Share history
+            partner.is_my_turn_to_speak = True # It's partner's turn now
+            partner.waiting_for_ollama_response = False # Partner isn't waiting yet
+            partner.conversation_last_response_time = current_time # Update partner's timer too, maybe? Or just initiator? Let's update both.
+            print(f"Sim {self.sim_id}: Passed turn to {partner.sim_id}")
         else:
-            # --- Handle Regular Thought ---
-            self.current_thought = response_text
-            self.thought_timer = THOUGHT_DURATION
+            print(f"Sim {self.sim_id}: ERROR - Partner {self.conversation_partner_id} not found during response handling!")
+            _end_interaction(self, city, all_sims) # Call as function with self parameter
+
+        # Update self
+        self.is_my_turn_to_speak = False # Not my turn anymore
+        self.conversation_turns += 1 # Increment turn counter *after* speaking
+        self.conversation_last_response_time = current_time # Reset timeout timer
+
+        # Check if max turns reached *after* this turn
+        if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
+                print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns after response.")
+                _end_interaction(self, city, all_sims) # Call as function with self parameter
+
+    else:
+        # --- Handle Regular Thought ---
+        self.current_thought = response_text
+        self.thought_timer = THOUGHT_DURATION
 
 
-    def _generate_thought(self, situation_description):
-        """Requests non-conversational thought generation asynchronously using Ollama."""
-        # Only generate if talking is enabled AND not currently in a conversation
-        if self.enable_talking and not self.is_interacting:
-            print(f"Sim {self.sim_id}: Requesting standard thought for: {situation_description}")
-            request_sent = self.ollama_client.request_thought_generation(self.sim_id, situation_description)
-            if not request_sent:
-                print(f"Sim {self.sim_id}: Standard thought generation request ignored (already active).")
-            # else:
-                # print(f"Sim {self.sim_id}: Standard thought generation requested.")
+def _generate_thought(self, situation_description):
+    """Requests non-conversational thought generation asynchronously using Ollama."""
+    # Only generate if talking is enabled AND not currently in a conversation
+    if self.enable_talking and not self.is_interacting:
+        print(f"Sim {self.sim_id}: Requesting standard thought for: {situation_description}")
+        request_sent = self.ollama_client.request_thought_generation(self.sim_id, situation_description)
+        if not request_sent:
+            print(f"Sim {self.sim_id}: Standard thought generation request ignored (already active).")
         # else:
-            # print(f"Sim {self.sim_id} talking blocked (interacting or disabled)")
+            # print(f"Sim {self.sim_id}: Standard thought generation requested.")
+    # else:
+        # print(f"Sim {self.sim_id} talking blocked (interacting or disabled)")

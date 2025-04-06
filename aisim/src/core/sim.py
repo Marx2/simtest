@@ -7,7 +7,7 @@ import os
 import json # Added for personality attributes
 from typing import List, Dict, Optional # Add typing
 from aisim.src.ai.ollama_client import OllamaClient
-from aisim.src.core.interaction import check_interactions
+from aisim.src.core.interaction import check_interactions, _end_interaction
 from aisim.src.core.city import TILE_SIZE  # Import TILE_SIZE constant
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, change_direction
 from aisim.src.core.movement import update as movement_update
@@ -53,7 +53,6 @@ SIM_COLOR = (255, 255, 255)  # White (fallback)
 SPRITE_WIDTH = 32  # Based on tile size
 SPRITE_HEIGHT = 32
 INTERACTION_DISTANCE = 20  # Max distance for interaction (pixels)
-THOUGHT_DURATION = 5.0  # Seconds to display thought bubble
 THOUGHT_COLOR = (240, 240, 240)  # Light grey for thought text
 THOUGHT_BG_COLOR = (50, 50, 50, 180)  # Semi-transparent dark background
 SIM_RADIUS = 5  # REMOVED
@@ -307,13 +306,13 @@ class Sim:
             # Check for conversation timeout (if waiting too long for a response)
             if self.waiting_for_ollama_response and (current_time - self.conversation_last_response_time > self.ollama_client.conversation_response_timeout):
                 print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} timed out.")
-                self._end_interaction(city, all_sims) # Pass city
+                _end_interaction(self, city, all_sims) # Call as function with self parameter
                 return # Stop further processing for this sim in this update
 
             # Check for max turns reached
             if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
                  print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns.")
-                 self._end_interaction(city, all_sims) # Pass city
+                 _end_interaction(self, city, all_sims) # Call as function with self parameter
                  return # Stop further processing
 
             # If it's my turn and I'm not waiting for a response, request one
@@ -336,7 +335,7 @@ class Sim:
                         # Optionally handle failure, e.g., end interaction after a few failed attempts
                 else:
                      print(f"Sim {self.sim_id}: ERROR - Conversation partner {self.conversation_partner_id} not found!")
-                     self._end_interaction(city, all_sims) # End interaction if partner is lost # Pass city
+                     _end_interaction(self, city, all_sims) # Call as function with self parameter
                      return
 
         # if logger:

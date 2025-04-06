@@ -14,7 +14,7 @@ from aisim.src.core.weather import Weather
 from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.logger import Logger
-from aisim.src.core.sim import THOUGHT_DURATION # Added import
+from aisim.src.core.interaction import THOUGHT_DURATION # Added import
 # Constants (Defaults, will be overridden by config)
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
@@ -255,8 +255,9 @@ def main():
                 target_sim = sims_dict.get(sim_id)
 
                 if target_sim and response_text:
-                    # Pass the response to the Sim's handler method
-                    target_sim.handle_ollama_response(response_text, current_sim_time, all_sims_list)
+                    # Pass the response to the interaction module's handler method
+                    from aisim.src.core import interaction
+                    interaction.handle_ollama_response(target_sim, response_text, current_sim_time, all_sims_list)
                 elif not target_sim:
                      print(f"Warning: Received Ollama result for unknown Sim ID: {sim_id}")
                 # The old direct setting of current_thought/thought_timer is now handled within handle_ollama_response
