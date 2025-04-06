@@ -68,7 +68,8 @@ def main():
             max(0, min(random.randint(0, SCREEN_WIDTH), SCREEN_WIDTH - TILE_SIZE -1)),
             max(0, min(random.randint(0, SCREEN_HEIGHT), SCREEN_HEIGHT - TILE_SIZE -1)),
             ollama_client, # Pass the client instance
-            enable_talking # Enable/disable talking from config
+            enable_talking, # Enable/disable talking from config
+            sim_config.get('bubble_display_time_seconds', 5.0) # Pass bubble duration, default 5.0
         )
         sims_dict[new_sim.sim_id] = new_sim
 

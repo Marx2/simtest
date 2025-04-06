@@ -235,8 +235,8 @@ def _format_personality_for_prompt(personality: Dict, sex: str) -> str:
 class Sim:
     """Represents a single Sim in the simulation."""
 
-    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, enable_talking: bool):
-        """Initializes a Sim with ID, position, and Ollama client."""
+    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, enable_talking: bool, bubble_display_time: float = 5.0):
+        """Initializes a Sim with ID, position, Ollama client, and bubble display time."""
         self.sim_id = sim_id  # Store the unique ID
         self.is_interacting = False
         self.interaction_timer = 0.0
@@ -281,6 +281,9 @@ class Sim:
         self.conversation_partner_id: Optional[any] = None # Store partner ID
         self.conversation_turns: int = 0
         self.conversation_last_response_time: float = 0.0
+        self.bubble_display_time: float = bubble_display_time # Store configured bubble time
+        self.conversation_message: Optional[str] = None # Separate attribute for conversation text
+        self.conversation_message_timer: float = 0.0 # Timer for conversation bubble
     # REMOVED DUPLICATE _load_sprite method
     def update(self, dt, city, weather_state, all_sims: List['Sim'], logger, current_time, tile_size, direction_change_frequency): # Add tile_size and type hint
         """Updates the Sim's state, following a path if available, and logs data."""
@@ -344,11 +347,13 @@ class Sim:
             if not self.path:  # Still no path (e.g., couldn't find one)
                 return
 
-        # Update thought timer
+        # Update thought timer (for non-conversation thoughts)
         if self.current_thought:
             self.thought_timer -= dt
             if self.thought_timer <= 0:
                 self.current_thought = None
+
+
         # Removed redundant path reset logic that was causing Sims to stop
 
         # --- Mood Update based on Weather ---
@@ -425,8 +430,10 @@ class Sim:
 
         if self.is_interacting and self.conversation_partner_id is not None:
             # --- Handle Conversation Response ---
-            self.current_thought = response_text # Display the response
-            self.thought_timer = THOUGHT_DURATION # Show bubble
+            # Use the new attributes for conversation messages
+            self.conversation_message = response_text
+            self.conversation_message_timer = self.bubble_display_time # Use configured duration
+            # self.current_thought = None # Clear regular thought if starting conversation response? Optional.
 
             # Add to history
             new_entry = {"speaker": self.first_name, "line": response_text}
@@ -579,8 +586,20 @@ class Sim:
         
         bubble_rect = pygame.Rect(0, 0, 0, 0) # Initialize bubble_rect
 
-        if self.current_thought:
-            wrapped_lines = wrap_text(self.current_thought, SIM_FONT, MAX_BUBBLE_WIDTH - 10)
+        # --- Draw Thought/Conversation Bubbles ---
+        bubble_text = None
+        bubble_timer = 0.0
+
+        # Prioritize showing conversation message if available
+        if self.conversation_message:
+            bubble_text = self.conversation_message
+            bubble_timer = self.conversation_message_timer
+        elif self.current_thought: # Fallback to regular thought
+            bubble_text = self.current_thought
+            bubble_timer = self.thought_timer
+
+        if bubble_text:
+            wrapped_lines = wrap_text(bubble_text, SIM_FONT, MAX_BUBBLE_WIDTH - 10) # Use bubble_text here
 
             # Calculate total height needed
             total_height = len(wrapped_lines) * line_height
