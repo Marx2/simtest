@@ -10,7 +10,7 @@
   "simulation": {
     "initial_sims": 12,
     "fps": 60,
-    "enable_talking": false,
+    "enable_talking": true,
     "weather_transition_time": 15.0,
     "ignore_interaction_time": 15.0,
     "bubble_display_time_seconds": 5.0

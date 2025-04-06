@@ -180,13 +180,18 @@ def change_direction(sim, city, direction_change_frequency):
             new_direction = random.choice(available_directions)
         else:
             new_direction = random.choice(available_directions)  # Choose again
+        print(f"Sim {sim.sim_id}: Available directions: {available_directions}, chosen direction: {new_direction}")
         # Update the Sim's path
         sim.path = get_path((sim.x, sim.y), new_direction, city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
         if sim.path:
             sim.path_index = 0
             sim.target = sim.path[sim.path_index]
             # print(f"Sim {sim.sim_id}: Changed direction to {new_direction}")
+        else:
+            print(f"Sim {sim.sim_id}: No path found after changing direction.")
+
     else:
+        new_direction = None
         print(f"Sim {sim.sim_id}: No path found in new direction {new_direction}")
 
 def get_available_directions(sim, city):
@@ -196,7 +201,7 @@ def get_available_directions(sim, city):
     # print(f"City object attributes: {city.__dict__}")
     current_node = get_node_from_coords(sim.x, sim.y, city.width, city.height)
     if current_node:
-        print(f"Sim {sim.sim_id}: current_node = {current_node}")
+        # print(f"Sim {sim.sim_id}: current_node = {current_node}")
         if current_node not in city.graph.nodes:
             print(f"Sim {sim.sim_id}: current_node {current_node} not in city.graph.nodes")
             return []
@@ -212,4 +217,5 @@ def get_available_directions(sim, city):
                     break
                 if not is_interacting:
                     directions.append(neighbor_coords)
+    print(f"Sim {sim.sim_id}: Available directions: {directions}")
     return directions
