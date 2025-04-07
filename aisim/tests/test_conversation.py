@@ -132,7 +132,7 @@ class TestConversation(unittest.TestCase):
 
         # Send the request using the determined first speaker
         # Pass the first_speaker as the 'self' argument for _send_conversation_request
-        _send_conversation_request(first_speaker, second_speaker_listener, city, all_sims)
+        _send_conversation_request(first_speaker,first_speaker, second_speaker_listener, city, all_sims)
 
         # Wait for Ollama response (adjust sleep time if needed)
         time.sleep(5)
