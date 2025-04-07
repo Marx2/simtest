@@ -1,51 +1,32 @@
 import ollama
 import json
-import os
+# import os # No longer needed for CONFIG_PATH
 import threading # Added
 import queue # Added
 from typing import Optional, Tuple, List, Dict # Added for type hinting
-
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
+from aisim.src.core.configuration import config_manager # Import the centralized config manager
 class OllamaClient:
     """Handles communication with the Ollama API, including asynchronous requests.""" # Updated docstring
 
     def __init__(self):
-        """Loads configuration and initializes the Ollama client and result queue.""" # Updated docstring
-        self.config = self._load_config()
-        self.client = ollama.Client(host=self.config['ollama']['host'])
-        self.model = self.config['ollama']['model']
-        self.prompt_template = self.config['ollama']['default_prompt_template']
-        self.conversation_prompt_template = self.config['ollama'].get('conversation_prompt_template', self.prompt_template) # Fallback to default if missing
-        self.conversation_response_timeout = self.config['ollama'].get('conversation_response_timeout', 30.0) # Default 30s
+        """Initializes the Ollama client and result queue using centralized configuration.""" # Updated docstring
+        # Get config values using the config_manager
+        host = config_manager.get_entry('ollama.host', 'http://localhost:11434')
+        self.model = config_manager.get_entry('ollama.model', 'phi3') # Provide a reasonable default model
+        self.prompt_template = config_manager.get_entry('ollama.default_prompt_template', 'Default prompt: {situation}')
+        self.conversation_prompt_template = config_manager.get_entry('ollama.conversation_prompt_template', self.prompt_template) # Fallback to default prompt template
+        self.conversation_response_timeout = config_manager.get_entry('ollama.conversation_response_timeout', 30.0) # Default 30s
+
+        self.client = ollama.Client(host=host)
         self.results_queue = queue.Queue() # Queue to store results from threads
         self.active_requests = set() # Keep track of active requests per Sim ID
-        print(f"Ollama client initialized. Host: {self.config['ollama']['host']}, Model: {self.model}")
+        print(f"Ollama client initialized. Host: {host}, Model: {self.model}")
         # Verify the conversation template has the required placeholders
         if not all(k in self.conversation_prompt_template for k in ['{my_name}', '{other_name}', '{history}', '{personality_info}']):
              print("Warning: conversation_prompt_template might be missing required placeholders ({my_name}, {other_name}, {history}, {personality_info})")
 
 
-    def _load_config(self):
-        """Loads the configuration from config.json."""
-        try:
-            with open(CONFIG_PATH, 'r') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            print(f"Error: Configuration file not found at {CONFIG_PATH}")
-            # Return default config as fallback
-            return {
-                "ollama": {
-                    "host": "http://localhost:11434",
-                    "model": "deepseek-r1:7b",
-                    "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble.",
-                    "conversation_prompt_template": "You are {my_name}, a character in a life simulation.\n{personality_info}\n\nYou are talking to {other_name}. Continue the conversation naturally based on your personality and the history. Keep your response concise (1-2 sentences).\n\nConversation History:\n{history}\n\n{my_name}:", # Default added here
-                    "conversation_response_timeout": 30.0
-                 }
-            }
-        except json.JSONDecodeError:
-            print(f"Error: Could not decode JSON from {CONFIG_PATH}")
-            raise # Re-raise error as it's critical
-
+    # Removed _load_config method as configuration is now handled by ConfigManager
     def _generate_worker(self, sim_id, situation_description):
         """Worker function to run Ollama generation in a separate thread."""
         # print(f"Ollama worker started for Sim {sim_id}") # Debug

@@ -8,7 +8,9 @@ import random
 import uuid
 import json
 import textwrap # Added for panel text wrapping
-import os # Keep os import
+# Keep os import if needed elsewhere, otherwise remove if only used for CONFIG_PATH
+import os
+from aisim.src.core.configuration import config_manager # Import the centralized config manager
 from aisim.src.core.sim import Sim # Import Sim class (constants are now internal or loaded from config)
 from aisim.src.core.weather import Weather
 from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
@@ -19,26 +21,7 @@ from aisim.src.core.interaction import THOUGHT_DURATION # Added import
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 WINDOW_TITLE = "AI Sims Simulation"
-FPS = 60
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'config', 'config.json')
-
-def load_config():
-    """Loads simulation configuration."""
-    try:
-        with open(CONFIG_PATH, 'r') as f:
-            config = json.load(f)
-            # Apply defaults if keys are missing
-            config.setdefault('simulation', {})
-            config['simulation'].setdefault('initial_sims', 10)
-            config['simulation'].setdefault('fps', 60)
-            config['simulation'].setdefault('enable_talking', False)
-            return config
-    except FileNotFoundError:
-        print(f"Warning: Config file not found at {CONFIG_PATH}. Using defaults.")
-        return {"simulation": {"initial_sims": 10, "fps": 60}}
-    except json.JSONDecodeError:
-        print(f"Warning: Error decoding config file {CONFIG_PATH}. Using defaults.")
-        return {"simulation": {"initial_sims": 10, "fps": 60}}
+FPS = 60 # Keep default FPS if needed before config load, otherwise remove
 
 # --- Helper Functions ---
 def wrap_text(text, font, max_width):
@@ -99,13 +82,14 @@ def get_mood_description(mood_value):
 
 # --- End Helper Functions ---
 def main():
-    # Load config first
-    # Load config first
-    config = load_config()
-    simulation_config = config.get('simulation', {}) # Get simulation specific config
-    sim_creation_config = config.get('sim', {}) # Get sim specific config for creation
-    fps = simulation_config.get('fps', 60) # Use simulation_config here
-
+    # Get config values using the centralized manager
+    fps = config_manager.get_entry('simulation.fps', 60)
+    initial_sims = config_manager.get_entry('simulation.initial_sims', 10)
+    enable_talking = config_manager.get_entry('simulation.enable_talking', False)
+    bubble_display_time = config_manager.get_entry('simulation.bubble_display_time_seconds', 5.0)
+    sim_creation_config = config_manager.get_entry('sim', {}) # Pass the whole 'sim' section if Sim expects it
+    weather_config = config_manager.get_entry('weather', {}) # Get weather specific config
+    movement_direction_change_frequency = config_manager.get_entry('movement.direction_change_frequency', 5.0)
     pygame.init() # Pygame init needs to happen before font loading in Sim
     # Create AI Client
     ollama_client = OllamaClient() # Reads its own config section
@@ -115,21 +99,21 @@ def main():
     ui_font = pygame.font.SysFont(None, 24) # Font for UI text
     log_font = pygame.font.SysFont(None, 18) # Smaller font for event log
     # Create Simulation Components
-    weather = Weather(config, SCREEN_WIDTH, SCREEN_HEIGHT) # Pass FULL config and screen dimensions
-    city = City(SCREEN_WIDTH, SCREEN_HEIGHT)
-    enable_talking = simulation_config.get('enable_talking', False) # Use simulation_config
+    weather = Weather(weather_config, SCREEN_WIDTH, SCREEN_HEIGHT) # Pass weather config section
+    city = City(SCREEN_WIDTH, SCREEN_HEIGHT) # City will use config_manager internally now
+    # enable_talking is retrieved above
 
     # Store sims in a dictionary for easy lookup by ID
     sims_dict = {}
-    for _ in range(simulation_config.get('initial_sims', 10)): # Use simulation_config
+    for _ in range(initial_sims): # Use retrieved initial_sims
         new_sim = Sim(
             sim_id=str(uuid.uuid4()),  # Generate unique ID
             x=max(0, min(random.randint(0, SCREEN_WIDTH), SCREEN_WIDTH - TILE_SIZE -1)),
             y=max(0, min(random.randint(0, SCREEN_HEIGHT), SCREEN_HEIGHT - TILE_SIZE -1)),
             ollama_client=ollama_client, # Pass the client instance
-            enable_talking=enable_talking, # Enable/disable talking from config
-            sim_config=sim_creation_config, # Pass the sim-specific config dictionary
-            bubble_display_time=simulation_config.get('bubble_display_time_seconds', 5.0) # Pass bubble duration from simulation_config
+            enable_talking=enable_talking, # Use retrieved enable_talking
+            sim_config=sim_creation_config, # Pass the retrieved sim config dictionary
+            bubble_display_time=bubble_display_time # Pass retrieved bubble_display_time
         )
         sims_dict[new_sim.sim_id] = new_sim
 
@@ -242,7 +226,7 @@ def main():
             all_sims_list = list(sims_dict.values()) # Get list for passing to update
             for sim in all_sims_list:
                 # Pass city.TILE_SIZE to sim.update for arrival checks
-                sim.update(dt, city, weather.current_state, all_sims_list, logger, current_sim_time, TILE_SIZE, config.get('movement', {}).get('direction_change_frequency', 5.0)) # Use imported TILE_SIZE and safe config access
+                sim.update(dt, city, weather.current_state, all_sims_list, logger, current_sim_time, TILE_SIZE, movement_direction_change_frequency) # Use retrieved frequency
                 # Interaction check is now called within sim.update, remove explicit call here
             #   sim._check_interactions(sims, logger, current_sim_time) # Removed redundant call
             weather.update(dt)
@@ -291,7 +275,9 @@ def main():
         screen.blit(weather_surface, weather_rect)
 
         # Draw Weather Countdown Timer (Below Weather Status)
-        if weather.weather_config.get('enable_weather_changes', False): # Only show if changes are enabled
+        # Weather object now uses config_manager internally or was initialized with its config
+        # Assuming Weather class is refactored or handles its config access internally
+        if config_manager.get_entry('weather.enable_weather_changes', False): # Check directly via config_manager
             remaining_time = max(0, weather.change_frequency - weather.time_since_last_change)
             countdown_text = f"Next change in: {int(remaining_time)}s" # Cast to int
             countdown_surface = ui_font.render(countdown_text, True, (220, 220, 220)) # Slightly dimmer white

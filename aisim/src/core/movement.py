@@ -4,10 +4,9 @@ import math
 import random
 import os
 from aisim.src.core.sim import check_interactions
+from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
-TILE_SIZE = 32
-
+TILE_SIZE = config_manager.get_entry('city.tile_size')
 def get_tile_coords(x, y, grid_width, grid_height):
     """Converts pixel coordinates to grid tile coordinates (col, row)."""
     col = round(x / TILE_SIZE)

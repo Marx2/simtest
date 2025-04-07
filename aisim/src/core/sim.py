@@ -6,46 +6,31 @@ import json
 from typing import List, Dict, Optional
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import check_interactions, _end_interaction
-from aisim.src.core.city import TILE_SIZE
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, change_direction, movement_update
 from aisim.src.core.panel import draw_bubble
 from aisim.src.core.personality import _assign_sex, _generate_personality, _format_personality_for_prompt
+from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
-# --- Load Configuration ---
-CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
-try:
-    with open(CONFIG_FILE_PATH, 'r') as f:
-        CONFIG_DATA = json.load(f)
-        SIM_CONFIG = CONFIG_DATA.get("sim", {}) # Get the sim specific config
-except FileNotFoundError:
-    print(f"Error: Config file not found at {CONFIG_FILE_PATH}")
-    SIM_CONFIG = {} # Default to empty if file not found
-except json.JSONDecodeError:
-    print(f"Error: Could not decode JSON from {CONFIG_FILE_PATH}")
-    SIM_CONFIG = {}
+TILE_SIZE = config_manager.get_entry('city.tile_size', 32) # Add default value
 
-# --- Load Attributes Data using path from config ---
+# --- Load Attributes Data ---
 ATTRIBUTES_DATA = {} # Default empty
-ATTRIBUTES_FILE_PATH = SIM_CONFIG.get("attributes_file_path") # Get path from loaded config
+ATTRIBUTES_FILE_PATH = config_manager.get_entry('sim.attributes_file_path')
 if ATTRIBUTES_FILE_PATH:
-    absolute_attributes_path = ATTRIBUTES_FILE_PATH # Assuming path is relative to CWD or project root
-
     try:
-        with open(absolute_attributes_path, 'r') as f:
+        with open(ATTRIBUTES_FILE_PATH, 'r') as f:
             ATTRIBUTES_DATA = json.load(f)
     except FileNotFoundError:
-        print(f"Error: Attributes file not found at {absolute_attributes_path} (path from config: {ATTRIBUTES_FILE_PATH})")
+        print(f"Error: Attributes file not found at {ATTRIBUTES_FILE_PATH}")
     except json.JSONDecodeError:
-        print(f"Error: Could not decode JSON from {absolute_attributes_path}")
+        print(f"Error: Could not decode JSON from {ATTRIBUTES_FILE_PATH}")
 else:
-    print("Warning: 'attributes_file_path' not found in sim config.")
-# --- End Load Attributes Data ---
-# --- End Load Configuration ---
+    print("Warning: 'sim.attributes_file_path' not configured")
 
 def get_character_names():
     """Extracts character names from sprite filenames in the specified directory."""
     names = []
-    character_sprite_dir = SIM_CONFIG.get("character_sprite_dir")
+    character_sprite_dir = config_manager.get_entry('sim.character_sprite_dir')
     if not character_sprite_dir or not os.path.isdir(character_sprite_dir):
         print(f"Error: Character sprite directory not found or not configured: {character_sprite_dir}")
         return []
@@ -192,7 +177,7 @@ class Sim:
 
         # Check for max turns reached
         # Note: Using self.ollama_client requires ollama_client to be passed or accessible
-        if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
+        if self.conversation_turns >= config_manager.get_entry('ollama.conversation_max_turns', 6):
              print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns.")
              _end_interaction(self, city, all_sims) # Assumes _end_interaction is accessible
              return # Stop further processing within this method
@@ -299,7 +284,7 @@ class Sim:
     def _load_sprite_sheet(self):
        """Loads a random Sim's sprite sheet from the character sprites directory."""
        try:
-           character_sprite_dir = SIM_CONFIG.get("character_sprite_dir")
+           character_sprite_dir = config_manager.get_entry('sim.character_sprite_dir')
            if not character_sprite_dir or not os.path.isdir(character_sprite_dir):
                print(f"Error: Character sprite directory not found or not configured in Sim._load_sprite_sheet: {character_sprite_dir}")
                return "Unknown_Sim", None # Return default on error

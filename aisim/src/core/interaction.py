@@ -2,6 +2,7 @@ import math
 from typing import List
 import logging
 logging.basicConfig(level=logging.DEBUG)
+from aisim.src.core.configuration import config_manager
 import json
 import random # Import random
 
@@ -13,10 +14,7 @@ THOUGHT_DURATION = 5.0  # Seconds to display thought bubble
 def check_interactions(self, all_sims, logger, current_time, city): # Add city parameter
     """Checks for and handles interactions with nearby Sims, logging them."""
     INTERACTION_COOLDOWN = 1.0  # Minimum time between interactions (seconds)
-    # Load configuration
-    with open('aisim/config/config.json', 'r') as config_file:
-        config = json.load(config_file)
-    ignore_interaction_time = config['simulation'].get('ignore_interaction_time', 5.0)  # Default to 5.0 if not found
+    ignore_interaction_time = config_manager.get_entry('simulation.ignore_interaction_time', 5.0)
     # if logger:
     #     print(f"Sim {self.sim_id} checking interactions, enable_talking={self.enable_talking}, is_interacting={self.is_interacting}")
     # print(f"Sim {self.sim_id}: Checking interactions, is_interacting={self.is_interacting}")
@@ -256,7 +254,7 @@ def handle_ollama_response(self, response_text: str, current_time: float, all_si
         self.conversation_last_response_time = current_time # Reset timeout timer
 
         # Check if max turns reached *after* this turn
-        if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
+        if self.conversation_turns >= config_manager.get_entry('ollama.conversation_max_turns', 6):
                 print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns after response.")
                 _end_interaction(self, city, all_sims) # Call as function with self parameter
 
