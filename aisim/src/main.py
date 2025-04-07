@@ -226,11 +226,11 @@ def main():
             all_sims_list = list(sims_dict.values()) # Get list for passing to update
             for sim in all_sims_list:
                 # Pass city.TILE_SIZE to sim.update for arrival checks
-                sim.update(dt, city, weather.current_state, all_sims_list, logger, current_sim_time, TILE_SIZE, movement_direction_change_frequency) # Use retrieved frequency
+                sim.sim_update(dt, city, weather.current_state, all_sims_list, logger, current_sim_time, TILE_SIZE, movement_direction_change_frequency) # Use retrieved frequency
                 # Interaction check is now called within sim.update, remove explicit call here
             #   sim._check_interactions(sims, logger, current_sim_time) # Removed redundant call
-            weather.update(dt)
-            city.update(dt) # Update city state (currently does nothing)
+            weather.weather_update(dt)
+            city.city_update(dt) # Update city state (currently does nothing)
 
             # --- Poll for Ollama Results (Thoughts & Conversation Responses) ---
             while True:

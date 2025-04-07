@@ -104,7 +104,7 @@ class City:
                      self.tile_map[r][c] = 'prop_0_0'
 
 
-    def update(self, dt):
+    def city_update(self, dt):
         """Updates the city state (placeholder)."""
         pass # No updates needed for a static grid/graph yet
 

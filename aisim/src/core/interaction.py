@@ -235,34 +235,34 @@ def _initiate_conversation(self, other_sim, city, all_sims, current_time):
     # Decide who speaks first
     if random.choice([True, False]):
         first_speaker = self
-        second_speaker = other_sim
+        second_speaker_listener = other_sim
     else:
         first_speaker = other_sim
-        second_speaker = self
+        second_speaker_listener = self
 
     first_speaker.is_my_turn_to_speak = True
-    second_speaker.is_my_turn_to_speak = False
+    second_speaker_listener.is_my_turn_to_speak = False
 
     print(f"Sim {first_speaker.sim_id} speaks first.")
-    _send_conversation_request(self, first_speaker, second_speaker, city, all_sims)
+    _send_conversation_request(self, first_speaker, second_speaker_listener, city, all_sims)
 
-def _send_conversation_request(self, speaker, listener, city, all_sims):
+def _send_conversation_request(self, first_speaker, second_speaker_listener, city, all_sims):
     """Sends conversation request to Ollama client."""
-    request_sent = speaker.ollama_client.request_conversation_response(
-        speaker.sim_id,
-        speaker.first_name,
-        listener.first_name,
-        speaker.conversation_history,
-        speaker.personality
+    request_sent = first_speaker.ollama_client.request_conversation_response(
+        first_speaker.sim_id,
+        first_speaker.first_name,
+        second_speaker_listener.first_name,
+        first_speaker.conversation_history,
+        first_speaker.personality
     )
     if request_sent:
-        speaker.waiting_for_ollama_response = True
-        speaker.conversation_last_response_time = time.time()
-        print(f"Sim {speaker.sim_id}: Initial conversation request sent.")
+        first_speaker.waiting_for_ollama_response = True
+        first_speaker.conversation_last_response_time = time.time()
+        print(f"Sim {first_speaker.sim_id}: Initial conversation request sent.")
     else:
-        print(f"Sim {speaker.sim_id}: FAILED to send initial conversation request!")
+        print(f"Sim {first_speaker.sim_id}: FAILED to send initial conversation request!")
         _end_interaction(self, city, all_sims)
-        _end_interaction(listener, city, all_sims)
+        _end_interaction(second_speaker_listener, city, all_sims)
 
 def _generate_thought(self, situation_description):
     """Requests non-conversational thought generation asynchronously using Ollama."""

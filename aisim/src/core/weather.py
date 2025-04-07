@@ -50,12 +50,12 @@ class Weather:
 
         print(f"Initial weather: {self.current_state} (Changes possible every {self.change_frequency}s, transition: {self.transition_duration}s)")
 
-    def update(self, dt):
+    def weather_update(self, dt):
         """Updates the weather state based on time and manages effects."""
         enable_weather_changes = self.weather_config.get('enable_weather_changes', False)
         if not enable_weather_changes:
             # Still update effects even if weather type doesn't change
-            self._update_effects(dt)
+            self._effects_update(dt)
             return
 
         self.time_since_last_change += dt
@@ -79,7 +79,7 @@ class Weather:
                 self.transition_timer = 0
 
         # Update ongoing visual effects
-        self._update_effects(dt)
+        self._effects_update(dt)
 
 
     def get_current_color(self):
@@ -87,7 +87,7 @@ class Weather:
         # Base color remains the same, effects are overlays
         return self.colors.get(self.current_state, (0, 0, 0)) # Default to black
 
-    def _update_effects(self, dt):
+    def _effects_update(self, dt):
         """Updates the state of ongoing effects like rain."""
         if self.current_state == "Rainy":
             # Add new raindrops

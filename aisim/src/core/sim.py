@@ -107,14 +107,14 @@ class Sim:
         self.conversation_message: Optional[str] = None # Separate attribute for conversation text
         self.conversation_message_timer: float = 0.0 # Timer for conversation bubble
     # REMOVED DUPLICATE _load_sprite method
-    def update(self, dt, city, weather_state, all_sims: List['Sim'], logger, current_time, tile_size, direction_change_frequency): # Add tile_size and type hint
+    def sim_update(self, dt, city, weather_state, all_sims: List['Sim'], logger, current_time, tile_size, direction_change_frequency): # Add tile_size and type hint
         """Updates the Sim's state, following a path if available, and logs data."""
         self.tile_size = tile_size
         self.is_blocked = False # Reset blocked status
         # print(f"Sim {self.sim_id}: update called at start, x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}, path={self.path}")
         # Call the movement update method
         movement_update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency)
-        self.update_animation(dt) # Update animation frame
+        self.animation_update(dt) # Update animation frame
         if hasattr(self, 'last_update_time') and self.last_update_time == current_time:
             return
         self.last_update_time = current_time
@@ -122,7 +122,7 @@ class Sim:
         # --- Conversation Logic ---
         if self.is_interacting:
             # Handle conversation updates in a separate method
-            self.update_conversation(dt, city, all_sims, current_time)
+            self.conversation_update(dt, city, all_sims, current_time)
             # If the conversation ended within update_conversation, is_interacting might be False now.
             # We might need to return early if _end_interaction was called inside update_conversation.
             # Let's check if the sim is still interacting after the call.
@@ -163,7 +163,7 @@ class Sim:
         # --- Log Mood ---
         if logger:
             logger.log_mood(current_time, self.sim_id, self.mood)
-    def update_conversation(self, dt, city, all_sims: List['Sim'], current_time):
+    def conversation_update(self, dt, city, all_sims: List['Sim'], current_time):
         """Handles the logic for ongoing conversations."""
         # This method assumes self.is_interacting is True when called
 
@@ -215,7 +215,7 @@ class Sim:
                 return sim
         return None
 
-    def update_animation(self, dt):
+    def animation_update(self, dt):
         """Updates the animation frame based on elapsed time."""
         if not self.is_interacting:
             self.animation_timer += dt

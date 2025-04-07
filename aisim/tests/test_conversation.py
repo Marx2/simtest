@@ -125,14 +125,14 @@ class TestConversation(unittest.TestCase):
         # Determine who speaks first based on the state set by _initiate_conversation
         if sim1.is_my_turn_to_speak:
             first_speaker = sim1
-            second_speaker = sim2
+            second_speaker_listener = sim2
         else:
             first_speaker = sim2
-            second_speaker = sim1
+            second_speaker_listener = sim1
 
         # Send the request using the determined first speaker
         # Pass the first_speaker as the 'self' argument for _send_conversation_request
-        _send_conversation_request(first_speaker, second_speaker, city, all_sims)
+        _send_conversation_request(first_speaker, second_speaker_listener, city, all_sims)
 
         # Wait for Ollama response (adjust sleep time if needed)
         time.sleep(5)
