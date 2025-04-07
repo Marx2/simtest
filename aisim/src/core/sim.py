@@ -128,9 +128,6 @@ class Sim:
         # print(f"Sim {self.sim_id}: update called at start, x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}, path={self.path}")
         # Call the movement update method
         movement_update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency)
-        self.check_collision(all_sims)
-        if self.is_blocked:
-            self.handle_blocked(dt, city, direction_change_frequency)
         self.update_animation(dt) # Update animation frame
         if hasattr(self, 'last_update_time') and self.last_update_time == current_time:
             return
@@ -191,8 +188,6 @@ class Sim:
             if self.thought_timer <= 0:
                 self.current_thought = None
 
-        # Removed redundant path reset logic that was causing Sims to stop
-
         # --- Mood Update based on Weather ---
         if weather_state in ["Rainy", "Snowy"]:
             self.mood = max(-1.0, self.mood - 0.005 * dt)  # Slowly decrease mood in bad weather
@@ -209,26 +204,6 @@ class Sim:
         # --- Log Mood ---
         if logger:
             logger.log_mood(current_time, self.sim_id, self.mood)
-
-    def check_collision(self, all_sims):
-        """Checks for collision with other sims."""
-        for other_sim in all_sims:
-            if other_sim is not self:
-                distance = math.sqrt((self.x - other_sim.x) ** 2 + (self.y - other_sim.y) ** 2)
-                if distance < 30:  # Increased collision distance
-                    self.is_blocked = True
-                    break
-
-    def handle_blocked(self, dt, city, direction_change_frequency):
-        """Handles the Sim when it's blocked."""
-        self.block_timer = getattr(self, 'block_timer', 0.0) + dt
-        block_duration = 1.0  # Duration to stop in seconds
-        if self.block_timer < block_duration:
-            return  # Stay blocked
-
-        self.block_timer = 0.0  # Reset timer
-        # print(f"direction_change_frequency: {direction_change_frequency}")
-        change_direction(self, city, direction_change_frequency)
 
     def _find_sim_by_id(self, sim_id_to_find: any, all_sims: List['Sim']) -> Optional['Sim']:
         """Helper to find a Sim object by its ID."""
