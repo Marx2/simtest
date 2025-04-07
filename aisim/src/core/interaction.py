@@ -8,8 +8,8 @@ import random # Import random
 
 __all__ = ['check_interactions', '_end_interaction'] # Explicitly export functions
 
-INTERACTION_DISTANCE = 40  # Max distance for interaction (pixels)
-THOUGHT_DURATION = 5.0  # Seconds to display thought bubble
+INTERACTION_DISTANCE = config_manager.get_entry('simulation.interaction_distance')  # Max distance for interaction (pixels)
+THOUGHT_DURATION = config_manager.get_entry('simulation.thought_duration')  # Seconds to display thought bubble
 
 def check_interactions(self, all_sims, logger, current_time, city): # Add city parameter
     """Checks for and handles interactions with nearby Sims, logging them."""

@@ -1,10 +1,16 @@
 # aisim/src/core/panel.py
 import pygame
+import os
+from aisim.src.core.configuration import config_manager
 
 # Font will be initialized lazily inside draw_bubble
 PANEL_FONT = None
-TEXT_COLOR = (240, 240, 240) # Light grey for text
-BG_COLOR = (50, 50, 50, 180) # Semi-transparent dark background
+# PANEL_FONT_PATH = config_manager.get_entry('sim.panel_font_dir')
+PANEL_FONT_PATH = ''
+
+# Get colors from config with defaults
+TEXT_COLOR = tuple(config_manager.get_entry('ui.text_color', [240, 240, 240]))
+BG_COLOR = tuple(config_manager.get_entry('ui.bg_color', [50, 50, 50, 180]))
 
 def wrap_text(text, font, max_width):
     """Helper function to wrap text to fit within a specified width."""
@@ -47,7 +53,11 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
                 # Ensure font module is initialized (should be by main.py, but check)
                 if not pygame.font.get_init():
                     pygame.font.init()
-                PANEL_FONT = pygame.font.SysFont(None, 18)
+                           # Load the emoji-supporting font
+                if os.path.exists(PANEL_FONT_PATH):
+                    PANEL_FONT = pygame.font.Font(PANEL_FONT_PATH, 18)
+                else:
+                    PANEL_FONT = pygame.font.SysFont(None, 18)
             except pygame.error as e:
                  print(f"Error initializing default font in panel.py: {e}")
                  # Fallback or re-raise? For now, let it fail if font init fails.

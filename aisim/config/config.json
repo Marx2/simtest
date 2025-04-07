@@ -13,7 +13,9 @@
     "enable_talking": true,
     "weather_transition_time": 15.0,
     "ignore_interaction_time": 15.0,
-    "bubble_display_time_seconds": 5.0
+    "bubble_display_time_seconds": 5.0,
+    "interaction_distance": 40,
+    "thought_duration": 5.0
   },
   "movement": {
     "direction_change_frequency": 5.0
@@ -21,6 +23,10 @@
   "weather": {
     "enable_weather_changes": true,
     "weather_change_frequency": 60.0
+  },
+  "ui": {
+      "text_color": [240, 240, 240],
+      "bg_color": [50, 50, 50, 180]
   },
   "sim": {
     "sim_color": [255, 255, 255],
@@ -38,7 +44,8 @@
       "Latoya", "Maria", "Mei", "Tamara", "Yuriko", "Abigail"
     ],
     "attributes_file_path": "aisim/config/attributes.json",
-    "character_sprite_dir": "aisim/src/graphics/characters"
+    "character_sprite_dir": "aisim/src/graphics/characters",
+    "panel_font_dir": "aisim/src/graphics/fonts/NotoEmoji-Regular.ttf"
   },
   "city": {
     "grid_color": [40, 40, 40],
