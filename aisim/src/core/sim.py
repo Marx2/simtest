@@ -8,7 +8,7 @@ from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import check_interactions, _end_interaction
 from aisim.src.core.city import TILE_SIZE
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, change_direction
-from aisim.src.core.movement import update as movement_update
+from aisim.src.core.movement import update_sim_state as update_sim_state
 from aisim.src.core.panel import draw_bubble
 from aisim.src.core.personality import _assign_sex, _generate_personality, _format_personality_for_prompt
 
@@ -128,7 +128,7 @@ class Sim:
         self.is_blocked = False # Reset blocked status
         # print(f"Sim {self.sim_id}: update called at start, x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}, path={self.path}")
         # Call the movement update method
-        movement_update(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency)
+        update_sim_state(self, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency)
         self.check_collision(all_sims)
         if self.is_blocked:
             self.handle_blocked(dt, city, direction_change_frequency)
@@ -361,5 +361,3 @@ class Sim:
         if bubble_text:
             draw_bubble(screen, bubble_text, sim_pos) # Use the imported function
 
-
-    # _draw_thought_bubble method removed, functionality moved to panel.py
