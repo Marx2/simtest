@@ -9,8 +9,8 @@ from aisim.src.core.configuration import config_manager # Import the centralized
 TILE_SIZE = config_manager.get_entry('city.tile_size')
 def get_tile_coords(x, y, grid_width, grid_height):
     """Converts pixel coordinates to grid tile coordinates (col, row)."""
-    col = round(x / TILE_SIZE)
-    row = round(y / TILE_SIZE)
+    col = math.floor(x / TILE_SIZE)
+    row = math.floor(y / TILE_SIZE)
     # Clamp to grid bounds
     col = max(0, min(col, grid_width - 1))
     row = max(0, min(row, grid_height - 1))
@@ -118,9 +118,34 @@ def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time
             norm_dx = dx / distance
             norm_dy = dy / distance
             # --- Collision Detection ---
+            # Predict next position and tile
             next_x = sim.x + norm_dx * sim.speed * dt
             next_y = sim.y + norm_dy * sim.speed * dt
             next_tile = get_tile_coords(next_x, next_y, city.grid_width, city.grid_height)
+
+            # --- Collision Detection BEFORE Movement ---
+            collision_detected = False
+            for other_sim in all_sims:
+                if other_sim.sim_id == sim.sim_id:
+                    continue  # Don't check collision with self
+
+                # Ensure both tiles are valid before comparing, and compare tuple elements explicitly
+                if (other_sim.current_tile is not None and
+                    next_tile is not None and
+                    len(other_sim.current_tile) == 2 and
+                    len(next_tile) == 2 and
+                    other_sim.current_tile[0] == next_tile[0] and
+                    other_sim.current_tile[1] == next_tile[1]):
+                    # Collision detected, change direction immediately
+                    collision_detected = True
+                    # print(f"Sim {sim.sim_id}: Predicted collision at tile {next_tile} with Sim {other_sim.sim_id}. Changing direction.")
+                    change_direction(sim, city, direction_change_frequency)
+                    break  # Found a collision, no need to check further
+
+            if collision_detected:
+                # No movement this frame due to collision
+                sim.is_blocked = True
+                return
 
             collision_detected = False
             for other_sim in all_sims:

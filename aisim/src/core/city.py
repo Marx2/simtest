@@ -129,6 +129,10 @@ class City:
                 if r + 1 < self.grid_height:
                     neighbor_id = (c, r + 1)
                     G.add_edge(node_id, neighbor_id, weight=1)
+                # Check diagonal neighbor (bottom-right)
+                if c + 1 < self.grid_width and r + 1 < self.grid_height:
+                    neighbor_id = (c + 1, r + 1)
+                    G.add_edge(node_id, neighbor_id, weight=1.4)  # Slightly higher cost for diagonal movement
         print(f"Graph has {len(G.nodes)} nodes.")
         return G
 
