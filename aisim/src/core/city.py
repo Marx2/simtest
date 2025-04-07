@@ -134,7 +134,17 @@ class City:
 
 
     def draw(self, screen):
-        """Draws the city using the generated tile map."""
+        """Draws the city using the generated tile map, optionally adding debug borders."""
+        # Initialize font for debug text if needed
+        debug_font = None
+        show_debug_borders = config_manager.get_entry('city.debug_border', False)
+        if show_debug_borders:
+            try:
+                if not pygame.font.get_init(): pygame.font.init()
+                debug_font = pygame.font.SysFont(None, 14) # Small font for coordinates
+            except Exception as e:
+                print(f"Warning: Could not initialize font for debug borders: {e}")
+                show_debug_borders = False # Disable if font fails
         if not hasattr(self, 'tile_map') or not self.tile_map or not self.tile_images:
             # Fallback if tile map wasn't created (e.g., tileset loading failed)
             screen.fill((50, 50, 50)) # Dark grey background
@@ -168,6 +178,22 @@ class City:
                 else:
                     # Draw a fallback color if tile is missing or name is invalid
                     pygame.draw.rect(screen, self.grid_color, (c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE))
+
+        # --- Draw Debug Borders and Coordinates (if enabled) ---
+        if show_debug_borders and debug_font:
+            border_color = (0, 0, 0) # Black
+            text_color = (255, 255, 255) # White
+            for r in range(self.grid_height):
+                for c in range(self.grid_width):
+                    # Draw border
+                    rect = pygame.Rect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+                    pygame.draw.rect(screen, border_color, rect, 1) # width=1 for border
+
+                    # Draw coordinates
+                    coord_text = f"{c},{r}"
+                    text_surf = debug_font.render(coord_text, True, text_color)
+                    # Position text slightly inside the top-left corner
+                    screen.blit(text_surf, (rect.x + 2, rect.y + 2))
 
         # TODO: Load and draw actual building sprites based on a building map layer.
         # The current logic only draws grass, paths, and props.

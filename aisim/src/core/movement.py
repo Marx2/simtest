@@ -66,18 +66,27 @@ def get_path(start_coords, end_coords, graph, get_node_from_coords, get_coords_f
         return None
 
 def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency):
-    """Updates the Sim's state, following a path if available, and logs data."""
-    # print(f"Sim {sim.sim_id}: movement update called, x={sim.x:.2f}, y={sim.y:.2f}, target={sim.target}, path={sim.path}, path_index={sim.path_index}")
+    """Updates the Sim's state, following a path if available, checks for collisions, and logs data."""
+    sim.is_blocked = False # Reset blocked status at the start of movement update
+
+    # Clamp Sim coordinates to grid bounds *first*
+    sim.x = max(0, min(sim.x, city.width - 1))
+    sim.y = max(0, min(sim.y, city.height - 1))
+
+    # Update current tile based on position *before* any early returns
+    sim.current_tile = get_tile_coords(sim.x, sim.y, city.grid_width, city.grid_height)
+
+    # print(f"Sim {sim.sim_id}: movement update called, x={sim.x:.2f}, y={sim.y:.2f}, current_tile={sim.current_tile}, target={sim.target}, path={sim.path}, path_index={sim.path_index}")
     if not hasattr(sim, 'time_since_last_direction_change'):
         sim.time_since_last_direction_change = 0.0
+
+    # If interacting, no further movement logic is needed, but tile is updated
     if hasattr(sim, 'is_interacting') and sim.is_interacting:
-        # print(f"Sim {sim.sim_id}: movement update skipped due to is_interacting=True, interaction_timer={sim.interaction_timer}")
+        # print(f"Sim {sim.sim_id}: movement update skipped (after tile update) due to is_interacting=True, interaction_timer={sim.interaction_timer}")
         return
     # if logger:
         # print(f"Sim {sim.sim_id} update: x={sim.x:.2f}, y={sim.y:.2f}, target={sim.target}")
-    # Clamp Sim coordinates to grid bounds
-    sim.x = max(0, min(sim.x, city.width - 1))
-    sim.y = max(0, min(sim.y, city.height - 1))
+    # Coordinates are already clamped above before tile calculation
 
     # Only assign a new path if not interacting and no path exists
     if not sim.path and not sim.is_interacting:
@@ -108,12 +117,44 @@ def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time
             # Normalize direction vector
             norm_dx = dx / distance
             norm_dy = dy / distance
-            # Move
+            # --- Collision Detection ---
+            next_x = sim.x + norm_dx * sim.speed * dt
+            next_y = sim.y + norm_dy * sim.speed * dt
+            next_tile = get_tile_coords(next_x, next_y, city.grid_width, city.grid_height)
+
+            collision_detected = False
+            for other_sim in all_sims:
+                if other_sim.sim_id == sim.sim_id:
+                    continue # Don't check collision with self
+
+                # --- DEBUG PRINT ---
+                # print(f"Collision Check: Sim {sim.sim_id} moving to {next_tile}. Checking against Sim {other_sim.sim_id} at ({other_sim.x:.1f}, {other_sim.y:.1f}) on tile {other_sim.current_tile}")
+                # --- END DEBUG PRINT ---
+
+                # Ensure both tiles are valid before comparing, and compare tuple elements explicitly
+                if (other_sim.current_tile is not None and
+                    next_tile is not None and
+                    len(other_sim.current_tile) == 2 and
+                    len(next_tile) == 2 and
+                    other_sim.current_tile[0] == next_tile[0] and
+                    other_sim.current_tile[1] == next_tile[1]):
+                    # print(f"!!! Collision DETECTED: Sim {sim.sim_id} blocked by Sim {other_sim.sim_id} at tile {next_tile}") # Add print on detection
+                    collision_detected = True
+                    break # Found a collision, no need to check further
+
+            if collision_detected:
+                # print(f"Sim {sim.sim_id}: Collision detected at tile {next_tile}. Changing direction.")
+                sim.is_blocked = True
+                change_direction(sim, city, direction_change_frequency)
+                return # Stop movement processing for this frame
+
+            # --- Move (if no collision) ---
             if random.random() < 0.01:  # Reduced chance to stop
                 return
+            # is_blocked check might be redundant now due to early return, but keep for safety
             if not sim.is_blocked:
-                sim.x += norm_dx * sim.speed * dt
-                sim.y += norm_dy * sim.speed * dt
+                sim.x = next_x # Use pre-calculated next position
+                sim.y = next_y # Use pre-calculated next position
 
             # Determine the direction of movement
             new_angle = math.atan2(norm_dy, norm_dx)
@@ -161,8 +202,7 @@ def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time
     # Clamp mood
     sim.mood = max(-1.0, min(sim.mood, 1.0))
 
-    # Update current tile based on position
-    sim.current_tile = get_tile_coords(sim.x, sim.y, city.grid_width, city.grid_height)
+    # Current tile is now updated at the beginning of the function
 
     # --- Log Mood ---
     if logger:
