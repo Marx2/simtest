@@ -6,7 +6,7 @@ import os
 import json
 
 from aisim.src.core.movement import get_tile_coords, get_node_from_coords, get_coords_from_node, get_path
-from aisim.src.core.constants import TILE_SIZE
+TILE_SIZE = 32
 
 # Path to the configuration file relative to this script's location
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')

@@ -2,8 +2,11 @@ import pygame
 import networkx as nx
 import math
 import random
-from aisim.src.core.constants import TILE_SIZE
+import os
 from aisim.src.core.sim import check_interactions
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
+TILE_SIZE = 32
 
 def get_tile_coords(x, y, grid_width, grid_height):
     """Converts pixel coordinates to grid tile coordinates (col, row)."""
