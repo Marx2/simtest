@@ -1,8 +1,6 @@
 import pygame
 import random
 import math
-import uuid
-import textwrap
 import os
 import json
 from typing import List, Dict, Optional
@@ -30,18 +28,6 @@ except json.JSONDecodeError:
 ATTRIBUTES_DATA = {} # Default empty
 ATTRIBUTES_FILE_PATH = SIM_CONFIG.get("attributes_file_path") # Get path from loaded config
 if ATTRIBUTES_FILE_PATH:
-    # Construct absolute path relative to the config file's location might be safer
-    # Assuming config.json is at aisim/config/config.json
-    # and attributes.json path is relative to project root 'aisim/config/attributes.json'
-    # We need the project root or assume relative path works from execution context.
-    # Let's assume the path in config is relative to the project root for now.
-    # If execution isn't from project root, this might need adjustment.
-    # A potentially more robust way: Get config file dir, go up one level for project root.
-    # config_dir = os.path.dirname(CONFIG_FILE_PATH)
-    # project_root = os.path.dirname(config_dir)
-    # absolute_attributes_path = os.path.join(project_root, ATTRIBUTES_FILE_PATH)
-
-    # Sticking to simpler relative path assumption first:
     absolute_attributes_path = ATTRIBUTES_FILE_PATH # Assuming path is relative to CWD or project root
 
     try:
@@ -54,12 +40,7 @@ if ATTRIBUTES_FILE_PATH:
 else:
     print("Warning: 'attributes_file_path' not found in sim config.")
 # --- End Load Attributes Data ---
-
 # --- End Load Configuration ---
-
-import os
-
-# CHARACTER_SPRITE_DIR is now loaded from SIM_CONFIG["character_sprite_dir"]
 
 def get_character_names():
     """Extracts character names from sprite filenames in the specified directory."""
@@ -76,20 +57,10 @@ def get_character_names():
 
 CHARACTER_NAMES = get_character_names()
 
-
-# wrap_text function removed, moved to panel.py
-# Constants are now loaded from config.json via SIM_CONFIG
-# THOUGHT_COLOR and THOUGHT_BG_COLOR removed, defined in panel.py
-
 # Initialize font - needs pygame.init() - Ensure font module is initialized
 pygame.font.init()
-# SIM_FONT removed, defined in panel.py
 
 # --- Personality Generation Setup ---
-# ATTRIBUTES_FILE_PATH and ATTRIBUTES_DATA are now loaded earlier using config
-
-# FEMALE_NAMES are now loaded from SIM_CONFIG["female_names"]
-
 def _assign_sex(first_name):
     """Assigns sex based on a simple heuristic using common female names."""
     # Load female names from config, default to empty list, convert to set for efficient lookup
