@@ -32,6 +32,12 @@
       "num_traits": 3,
       "num_hobbies": 3,
       "num_quirks": 2
-    }
+    },
+    "female_names": [
+      "Ayesha", "Carmen", "Hailey", "Isabella", "Jane", "Jennifer",
+      "Latoya", "Maria", "Mei", "Tamara", "Yuriko", "Abigail"
+    ],
+    "attributes_file_path": "aisim/config/attributes.json",
+    "character_sprite_dir": "aisim/src/graphics/characters"
   }
 }
