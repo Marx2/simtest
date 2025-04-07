@@ -63,7 +63,7 @@ def get_path(start_coords, end_coords, graph, get_node_from_coords, get_coords_f
         print(f"Node not found for path calculation: start={start_node}, end={end_node}, error={e}")
         return None
 
-def update_sim_state(sim, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency):
+def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency):
     """Updates the Sim's state, following a path if available, and logs data."""
     # print(f"Sim {sim.sim_id}: movement update called, x={sim.x:.2f}, y={sim.y:.2f}, target={sim.target}, path={sim.path}, path_index={sim.path_index}")
     if not hasattr(sim, 'time_since_last_direction_change'):
