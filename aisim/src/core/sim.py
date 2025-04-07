@@ -67,6 +67,7 @@ class Sim:
         self.sex = _assign_sex(self.first_name, sim_config) # Assign sex using imported function
         self.x = x
         self.y = y
+        self.current_tile = None # Initialize current tile attribute
         self.speed = random.uniform(30, 70)  # Random speed for each sim
         self.sim_color = tuple(sim_config.get("sim_color", [255, 255, 255])) # Load from config, fallback white
         self.sprite_width = sim_config.get("sprite_width", 32)

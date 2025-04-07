@@ -334,7 +334,7 @@ def main():
             line_h_log = log_font.get_linesize()
 
             # Height for basic info block (consider portrait height)
-            basic_info_height = 4 * line_h_info # Name, ID, Sex, Mood
+            basic_info_height = 6 * line_h_info # Name, ID, Sex, Mood, Position, Tile
             estimated_content_height += max(portrait_size, basic_info_height) + line_spacing
 
             # Height for Personality
@@ -412,6 +412,18 @@ def main():
             mood_surf = info_font.render(mood_text, True, text_color)
             screen.blit(mood_surf, (text_start_x, text_block_start_y))
             text_block_start_y += line_h # Increment Y after drawing mood
+
+            # Add Position (x, y)
+            pos_text = f"Position: ({detailed_sim.x:.1f}, {detailed_sim.y:.1f})"
+            pos_surf = info_font.render(pos_text, True, text_color)
+            screen.blit(pos_surf, (text_start_x, text_block_start_y))
+            text_block_start_y += line_h
+
+            # Add Current Tile
+            tile_text = f"Tile: {detailed_sim.current_tile}" # Assumes current_tile is a tuple (col, row) or None
+            tile_surf = info_font.render(tile_text, True, text_color)
+            screen.blit(tile_surf, (text_start_x, text_block_start_y))
+            text_block_start_y += line_h
 
             # Ensure text doesn't overlap portrait if portrait is tall
             # current_y now represents the bottom edge after the portrait OR the text block, whichever is lower

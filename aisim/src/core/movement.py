@@ -160,7 +160,9 @@ def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time
     check_interactions(sim, all_sims, logger, current_time, city)
     # Clamp mood
     sim.mood = max(-1.0, min(sim.mood, 1.0))
-    sim.mood = max(-1.0, min(sim.mood, 1.0))
+
+    # Update current tile based on position
+    sim.current_tile = get_tile_coords(sim.x, sim.y, city.grid_width, city.grid_height)
 
     # --- Log Mood ---
     if logger:
