@@ -3,19 +3,19 @@ import networkx as nx
 import math
 import random
 import os
+import json
 
 from aisim.src.core.movement import get_tile_coords, get_node_from_coords, get_coords_from_node, get_path
 from aisim.src.core.constants import TILE_SIZE
 
-# Constants
-GRID_COLOR = (40, 40, 40)  # Dark grey for fallback
-TILESET_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'graphics', 'v3')
-
+# Path to the configuration file relative to this script's location
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
 class City:
     """Represents the city environment."""
     def __init__(self, width, height):
         """Initializes the city grid."""
         print("City constructor called")
+        self._load_config()
         self.width = width
         self.height = height
         self.grid_width = width // TILE_SIZE
@@ -26,13 +26,41 @@ class City:
         self.sims = [] # Initialize sims list
         self.active_conversation_partners = set() # Track sims currently talking
 
+    def _load_config(self):
+        """Loads configuration from the JSON file."""
+        try:
+            with open(CONFIG_PATH, 'r') as f:
+                self.config = json.load(f)
+            # Convert color list from JSON to tuple for Pygame
+            self.config['city']['grid_color'] = tuple(self.config['city']['grid_color'])
+            print("City config loaded successfully.")
+        except FileNotFoundError:
+            print(f"Error: Config file not found at {CONFIG_PATH}")
+            # Provide default values or raise an error
+            self.config = {'city': {'grid_color': (40, 40, 40), 'tileset_path': 'aisim/src/graphics/v3'}} # Fallback
+        except json.JSONDecodeError:
+            print(f"Error: Could not decode JSON from {CONFIG_PATH}")
+            self.config = {'city': {'grid_color': (40, 40, 40), 'tileset_path': 'aisim/src/graphics/v3'}} # Fallback
+        except KeyError as e:
+             print(f"Error: Missing key {e} in config file {CONFIG_PATH}")
+             # Handle missing keys, perhaps provide defaults
+             if 'city' not in self.config:
+                 self.config['city'] = {}
+             if 'grid_color' not in self.config['city']:
+                 self.config['city']['grid_color'] = (40, 40, 40) # Default fallback
+             else:
+                 # Ensure it's a tuple even if loaded correctly but needs conversion
+                 self.config['city']['grid_color'] = tuple(self.config['city']['grid_color'])
+             if 'tileset_path' not in self.config['city']:
+                 self.config['city']['tileset_path'] = 'aisim/src/graphics/v3' # Default fallback
+
     def _load_tilesets(self):
         """Loads the required tileset images."""
         self.tilesets = {}
         self.tile_images = {} # Store individual tile surfaces
         try:
             # Load grass tileset (assuming it's a single image with multiple variations)
-            grass_path = os.path.join(TILESET_PATH, 'tileset-grassland-grass.png')
+            grass_path = os.path.join(self.config['city']['tileset_path'], 'tileset-grassland-grass.png')
             grass_sheet = pygame.image.load(grass_path).convert_alpha()
             self.tilesets['grass'] = grass_sheet
             # Extract individual grass tiles (assuming 32x32)
@@ -42,7 +70,7 @@ class City:
                 self.tile_images[f'grass_{i}'] = grass_sheet.subsurface(tile_rect)
 
             # Load path tileset (similar logic)
-            path_path = os.path.join(TILESET_PATH, 'tileset-grassland-paths.png')
+            path_path = os.path.join(self.config['city']['tileset_path'], 'tileset-grassland-paths.png')
             path_sheet = pygame.image.load(path_path).convert_alpha()
             self.tilesets['path'] = path_sheet
             sheet_width, sheet_height = path_sheet.get_size()
@@ -52,7 +80,7 @@ class City:
                     self.tile_images[f'path_{r}_{c}'] = path_sheet.subsurface(tile_rect)
 
             # Load props tileset (e.g., trees, fences)
-            props_path = os.path.join(TILESET_PATH, 'tileset-grassland-props.png')
+            props_path = os.path.join(self.config['city']['tileset_path'], 'tileset-grassland-props.png')
             props_sheet = pygame.image.load(props_path).convert_alpha()
             self.tilesets['props'] = props_sheet
             # Extract individual prop tiles (assuming 32x32)
@@ -67,7 +95,7 @@ class City:
             print(f"Loaded {len(self.tile_images)} tiles.")
 
         except pygame.error as e:
-            print(f"Error loading tilesets from {TILESET_PATH}: {e}")
+            print(f"Error loading tilesets from {self.config['city']['tileset_path']}: {e}")
             self.tilesets = {} # Reset on error
             self.tile_images = {}
 
@@ -165,7 +193,7 @@ class City:
 
                 else:
                     # Draw a fallback color if tile is missing or name is invalid
-                    pygame.draw.rect(screen, GRID_COLOR, (c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE))
+                    pygame.draw.rect(screen, self.config['city']['grid_color'], (c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE))
 
         # TODO: Load and draw actual building sprites based on a building map layer.
         # The current logic only draws grass, paths, and props.

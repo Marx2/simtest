@@ -39,5 +39,9 @@
     ],
     "attributes_file_path": "aisim/config/attributes.json",
     "character_sprite_dir": "aisim/src/graphics/characters"
+  },
+  "city": {
+    "grid_color": [40, 40, 40],
+    "tileset_path": "aisim/src/graphics/v3"
   }
 }
