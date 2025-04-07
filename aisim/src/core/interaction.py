@@ -1,4 +1,5 @@
 import math
+import time
 from typing import List
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -69,83 +70,7 @@ def check_interactions(self, all_sims, logger, current_time, city): # Add city p
 
             # --- Initialize Conversation ---
             if self.enable_talking and other_sim.enable_talking:
-                # --- Global Conversation Lock Check ---
-                if self.sim_id in city.active_conversation_partners or other_sim.sim_id in city.active_conversation_partners:
-                    # print(f"Sim {self.sim_id} or {other_sim.sim_id} already talking, skipping new conversation.")
-                    # One of them is already talking, so this pair cannot start.
-                    # Do nothing here, just proceed without starting the conversation.
-                    pass # Explicitly do nothing if conversation is locked
-                else:
-                    # --- Lock Conversation Globally & Start Interaction State ---
-                    # Now that we know they *can* talk, stop movement and set flags.
-                    print(f"Sim {self.sim_id}: Starting interaction with Sim {other_sim.sim_id}")
-
-                    # Stop movement
-                    self.path = None
-                    self.target = None
-                    self.path_index = 0
-                    other_sim.path = None
-                    other_sim.target = None
-                    other_sim.path_index = 0
-
-                    # Set interaction state
-                    self.is_interacting = True
-                    other_sim.is_interacting = True
-                    self.interaction_timer = 0.0
-                    other_sim.interaction_timer = 0.0
-                    self.last_interaction_time = current_time # Update last interaction time
-                    other_sim.last_interaction_time = current_time
-
-                    # Add to global lock
-                    city.active_conversation_partners.add(self.sim_id)
-                    city.active_conversation_partners.add(other_sim.sim_id)
-                    print(f"Sim {self.sim_id} & {other_sim.sim_id}: Locked conversation. Active: {city.active_conversation_partners}")
-
-                    # --- Initialize Conversation Details ---
-                    print(f"Sim {self.sim_id} & {other_sim.sim_id}: Initializing conversation details.")
-                # Reset conversation state for both
-                self.conversation_history = []
-                other_sim.conversation_history = []
-                self.conversation_partner_id = other_sim.sim_id
-                other_sim.conversation_partner_id = self.sim_id
-                self.conversation_turns = 0
-                other_sim.conversation_turns = 0
-                self.waiting_for_ollama_response = False
-                other_sim.waiting_for_ollama_response = False
-                self.conversation_last_response_time = current_time
-                other_sim.conversation_last_response_time = current_time
-
-                # Decide who speaks first (randomly)
-                if random.choice([True, False]):
-                    first_speaker = self
-                    second_speaker = other_sim
-                else:
-                    first_speaker = other_sim
-                    second_speaker = self
-
-                first_speaker.is_my_turn_to_speak = True
-                second_speaker.is_my_turn_to_speak = False
-
-                print(f"Sim {first_speaker.sim_id} speaks first.")
-
-                # Request the first response
-                request_sent = first_speaker.ollama_client.request_conversation_response(
-                    first_speaker.sim_id,
-                    first_speaker.first_name,
-                    second_speaker.first_name,
-                    first_speaker.conversation_history, # Initially empty
-                    first_speaker.personality # Pass personality
-                )
-                if request_sent:
-                    first_speaker.waiting_for_ollama_response = True
-                    first_speaker.conversation_last_response_time = current_time # Start timeout timer
-                    print(f"Sim {first_speaker.sim_id}: Initial conversation request sent.")
-                else:
-                    print(f"Sim {first_speaker.sim_id}: FAILED to send initial conversation request!")
-                    # If the first request fails, maybe end the interaction immediately?
-                    # Need to pass city to _end_interaction
-                    _end_interaction(self, city, all_sims) # Call as function with self parameter
-                    _end_interaction(other_sim, city, all_sims) # Call as function with other_sim parameter
+                _initiate_conversation(self, other_sim, city, all_sims, current_time)
 
             # If talking is disabled, or if the global lock prevented the conversation:
             # The sims might still be close enough to trigger the initial `if dist < INTERACTION_DISTANCE...`
@@ -264,6 +189,81 @@ def handle_ollama_response(self, response_text: str, current_time: float, all_si
         self.thought_timer = THOUGHT_DURATION
 
 
+def _initiate_conversation(self, other_sim, city, all_sims, current_time):
+    """Handles the conversation initiation logic between two Sims."""
+    # Global Conversation Lock Check
+    if self.sim_id in city.active_conversation_partners or other_sim.sim_id in city.active_conversation_partners:
+        return
+
+    # Lock Conversation Globally & Start Interaction State
+    print(f"Sim {self.sim_id}: Starting interaction with Sim {other_sim.sim_id}")
+
+    # Stop movement
+    self.path = None
+    self.target = None
+    self.path_index = 0
+    other_sim.path = None
+    other_sim.target = None
+    other_sim.path_index = 0
+
+    # Set interaction state
+    self.is_interacting = True
+    other_sim.is_interacting = True
+    self.interaction_timer = 0.0
+    other_sim.interaction_timer = 0.0
+    self.last_interaction_time = current_time
+    other_sim.last_interaction_time = current_time
+
+    # Add to global lock
+    city.active_conversation_partners.add(self.sim_id)
+    city.active_conversation_partners.add(other_sim.sim_id)
+    print(f"Sim {self.sim_id} & {other_sim.sim_id}: Locked conversation. Active: {city.active_conversation_partners}")
+
+    # Initialize conversation details
+    print(f"Sim {self.sim_id} & {other_sim.sim_id}: Initializing conversation details.")
+    self.conversation_history = []
+    other_sim.conversation_history = []
+    self.conversation_partner_id = other_sim.sim_id
+    other_sim.conversation_partner_id = self.sim_id
+    self.conversation_turns = 0
+    other_sim.conversation_turns = 0
+    self.waiting_for_ollama_response = False
+    other_sim.waiting_for_ollama_response = False
+    self.conversation_last_response_time = current_time
+    other_sim.conversation_last_response_time = current_time
+
+    # Decide who speaks first
+    if random.choice([True, False]):
+        first_speaker = self
+        second_speaker = other_sim
+    else:
+        first_speaker = other_sim
+        second_speaker = self
+
+    first_speaker.is_my_turn_to_speak = True
+    second_speaker.is_my_turn_to_speak = False
+
+    print(f"Sim {first_speaker.sim_id} speaks first.")
+    _send_conversation_request(self, first_speaker, second_speaker, city, all_sims)
+
+def _send_conversation_request(self, speaker, listener, city, all_sims):
+    """Sends conversation request to Ollama client."""
+    request_sent = speaker.ollama_client.request_conversation_response(
+        speaker.sim_id,
+        speaker.first_name,
+        listener.first_name,
+        speaker.conversation_history,
+        speaker.personality
+    )
+    if request_sent:
+        speaker.waiting_for_ollama_response = True
+        speaker.conversation_last_response_time = time.time()
+        print(f"Sim {speaker.sim_id}: Initial conversation request sent.")
+    else:
+        print(f"Sim {speaker.sim_id}: FAILED to send initial conversation request!")
+        _end_interaction(self, city, all_sims)
+        _end_interaction(listener, city, all_sims)
+
 def _generate_thought(self, situation_description):
     """Requests non-conversational thought generation asynchronously using Ollama."""
     # Only generate if talking is enabled AND not currently in a conversation
@@ -272,7 +272,3 @@ def _generate_thought(self, situation_description):
         request_sent = self.ollama_client.request_thought_generation(self.sim_id, situation_description)
         if not request_sent:
             print(f"Sim {self.sim_id}: Standard thought generation request ignored (already active).")
-        # else:
-            # print(f"Sim {self.sim_id}: Standard thought generation requested.")
-    # else:
-        # print(f"Sim {self.sim_id} talking blocked (interacting or disabled)")
