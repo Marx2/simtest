@@ -4,14 +4,28 @@ import math
 import uuid
 import textwrap
 import os
-import json # Added for personality attributes
-from typing import List, Dict, Optional # Add typing
+import json
+from typing import List, Dict, Optional
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import check_interactions, _end_interaction
-from aisim.src.core.city import TILE_SIZE  # Import TILE_SIZE constant
+from aisim.src.core.city import TILE_SIZE
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, change_direction
 from aisim.src.core.movement import update as movement_update
-from aisim.src.core.panel import draw_bubble # Import the new function
+from aisim.src.core.panel import draw_bubble
+
+# --- Load Configuration ---
+CONFIG_FILE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'config.json')
+try:
+    with open(CONFIG_FILE_PATH, 'r') as f:
+        CONFIG_DATA = json.load(f)
+        SIM_CONFIG = CONFIG_DATA.get("sim", {}) # Get the sim specific config
+except FileNotFoundError:
+    print(f"Error: Config file not found at {CONFIG_FILE_PATH}")
+    SIM_CONFIG = {} # Default to empty if file not found
+except json.JSONDecodeError:
+    print(f"Error: Could not decode JSON from {CONFIG_FILE_PATH}")
+    SIM_CONFIG = {}
+# --- End Load Configuration ---
 
 import os
 
@@ -31,13 +45,8 @@ CHARACTER_NAMES = get_character_names()
 
 
 # wrap_text function removed, moved to panel.py
-# Constants
-SIM_COLOR = (255, 255, 255)  # White (fallback)
-SPRITE_WIDTH = 32  # Based on tile size
-SPRITE_HEIGHT = 32
-INTERACTION_DISTANCE = 20  # Max distance for interaction (pixels)
+# Constants are now loaded from config.json via SIM_CONFIG
 # THOUGHT_COLOR and THOUGHT_BG_COLOR removed, defined in panel.py
-SIM_RADIUS = 5  # REMOVED
 
 # Initialize font - needs pygame.init() - Ensure font module is initialized
 pygame.font.init()
@@ -62,15 +71,15 @@ def _assign_sex(first_name):
     """Assigns sex based on a simple heuristic using common female names."""
     return "Female" if first_name in FEMALE_NAMES else "Male"
 
-def _generate_personality(attributes_data):
-    """Generates a random personality dictionary based on loaded attributes."""
+def _generate_personality(attributes_data, personality_config):
+    """Generates a random personality dictionary based on loaded attributes and config."""
     if not attributes_data:
         return {} # Return empty if attributes couldn't be loaded
 
     personality = {}
-    num_traits = 3
-    num_hobbies = 3
-    num_quirks = 2
+    num_traits = personality_config.get("num_traits", 3)
+    num_hobbies = personality_config.get("num_hobbies", 3)
+    num_quirks = personality_config.get("num_quirks", 2)
 
     # Personality Traits (Mix positive/negative)
     positive_traits = attributes_data.get("personality_traits", {}).get("positive", [])
@@ -216,8 +225,8 @@ def _format_personality_for_prompt(personality: Dict, sex: str) -> str:
 class Sim:
     """Represents a single Sim in the simulation."""
 
-    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, enable_talking: bool, bubble_display_time: float = 5.0):
-        """Initializes a Sim with ID, position, Ollama client, and bubble display time."""
+    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, enable_talking: bool, sim_config: Dict, bubble_display_time: float = 5.0):
+        """Initializes a Sim with ID, position, Ollama client, config, and bubble display time."""
         self.sim_id = sim_id  # Store the unique ID
         self.is_interacting = False
         self.interaction_timer = 0.0
@@ -233,13 +242,18 @@ class Sim:
         self.x = x
         self.y = y
         self.speed = random.uniform(30, 70)  # Random speed for each sim
-        self.color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255))  # Fallback color
+        self.sim_color = tuple(sim_config.get("sim_color", [255, 255, 255])) # Load from config, fallback white
+        self.sprite_width = sim_config.get("sprite_width", 32)
+        self.sprite_height = sim_config.get("sprite_height", 32)
+        self.interaction_distance = sim_config.get("interaction_distance", 20)
+        self.sim_radius = sim_config.get("sim_radius", 5)
+        self.color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255)) # Keep random visual color distinct from fallback
         # self.sprite = self._load_sprite() # Load character sprite
         self.path = None
         self.path_index = 0
         self.target = None
         # --- Personality ---
-        self.personality = _generate_personality(ATTRIBUTES_DATA) # Keep the dictionary
+        self.personality = _generate_personality(ATTRIBUTES_DATA, sim_config.get("personality", {})) # Pass personality config
         self.personality_description = _format_personality_for_prompt(self.personality, self.sex) # Pre-calculate description string, passing sex
         # --- End Personality ---
         self.memory = []  # List to store significant events or interactions
@@ -398,8 +412,8 @@ class Sim:
             return None
 
         # Define the dimensions of each sub-sprite
-        width = SPRITE_WIDTH
-        height = SPRITE_HEIGHT
+        width = self.sprite_width
+        height = self.sprite_height
 
         # Determine row based on direction (0-based index)
         # Row 0: down (Task desc: Row 1)
@@ -435,8 +449,8 @@ class Sim:
         if not self.sprite_sheet:
             return None
 
-        width = SPRITE_WIDTH
-        height = SPRITE_HEIGHT
+        width = self.sprite_width
+        height = self.sprite_height
         row = 0  # Front-facing row
         col = 0  # First animation frame
 
@@ -477,10 +491,10 @@ class Sim:
         # Draw Sim sprite or fallback circle
         if sprite:
             # Center the sprite on the sim's position
-            screen.blit(sprite, (sim_pos[0] - SPRITE_WIDTH // 2, sim_pos[1] - SPRITE_HEIGHT // 2))
+            screen.blit(sprite, (sim_pos[0] - self.sprite_width // 2, sim_pos[1] - self.sprite_height // 2))
         else:
             # Fallback: draw a colored circle
-            pygame.draw.circle(screen, self.color, sim_pos, SIM_RADIUS)
+            pygame.draw.circle(screen, self.sim_color, sim_pos, self.sim_radius) # Use configured fallback color and radius
 
         # Draw conversation or thought bubble using the imported function
         bubble_text = None

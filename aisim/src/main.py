@@ -9,7 +9,7 @@ import uuid
 import json
 import textwrap # Added for panel text wrapping
 import os # Keep os import
-from aisim.src.core.sim import Sim, SPRITE_WIDTH, SPRITE_HEIGHT # Import Sim and sprite constants
+from aisim.src.core.sim import Sim # Import Sim class (constants are now internal or loaded from config)
 from aisim.src.core.weather import Weather
 from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
 from aisim.src.ai.ollama_client import OllamaClient
@@ -102,8 +102,9 @@ def main():
     # Load config first
     # Load config first
     config = load_config()
-    sim_config = config['simulation']
-    fps = sim_config['fps']
+    simulation_config = config.get('simulation', {}) # Get simulation specific config
+    sim_creation_config = config.get('sim', {}) # Get sim specific config for creation
+    fps = simulation_config.get('fps', 60) # Use simulation_config here
 
     pygame.init() # Pygame init needs to happen before font loading in Sim
     # Create AI Client
@@ -116,18 +117,19 @@ def main():
     # Create Simulation Components
     weather = Weather(config, SCREEN_WIDTH, SCREEN_HEIGHT) # Pass FULL config and screen dimensions
     city = City(SCREEN_WIDTH, SCREEN_HEIGHT)
-    enable_talking = config['simulation']['enable_talking']
+    enable_talking = simulation_config.get('enable_talking', False) # Use simulation_config
 
     # Store sims in a dictionary for easy lookup by ID
     sims_dict = {}
-    for _ in range(sim_config['initial_sims']):
+    for _ in range(simulation_config.get('initial_sims', 10)): # Use simulation_config
         new_sim = Sim(
-            str(uuid.uuid4()),  # Generate unique ID
-            max(0, min(random.randint(0, SCREEN_WIDTH), SCREEN_WIDTH - TILE_SIZE -1)),
-            max(0, min(random.randint(0, SCREEN_HEIGHT), SCREEN_HEIGHT - TILE_SIZE -1)),
-            ollama_client, # Pass the client instance
-            enable_talking, # Enable/disable talking from config
-            sim_config.get('bubble_display_time_seconds', 5.0) # Pass bubble duration, default 5.0
+            sim_id=str(uuid.uuid4()),  # Generate unique ID
+            x=max(0, min(random.randint(0, SCREEN_WIDTH), SCREEN_WIDTH - TILE_SIZE -1)),
+            y=max(0, min(random.randint(0, SCREEN_HEIGHT), SCREEN_HEIGHT - TILE_SIZE -1)),
+            ollama_client=ollama_client, # Pass the client instance
+            enable_talking=enable_talking, # Enable/disable talking from config
+            sim_config=sim_creation_config, # Pass the sim-specific config dictionary
+            bubble_display_time=simulation_config.get('bubble_display_time_seconds', 5.0) # Pass bubble duration from simulation_config
         )
         sims_dict[new_sim.sim_id] = new_sim
 
@@ -169,7 +171,8 @@ def main():
                     # Find the closest sim to the click
                     for sim in sims_dict.values():
                         # Use sprite dimensions for click detection if available
-                        sim_rect = pygame.Rect(sim.x - SPRITE_WIDTH // 2, sim.y - SPRITE_HEIGHT // 2, SPRITE_WIDTH, SPRITE_HEIGHT)
+                        # Use sim's own sprite dimensions now loaded from config
+                        sim_rect = pygame.Rect(sim.x - sim.sprite_width // 2, sim.y - sim.sprite_height // 2, sim.sprite_width, sim.sprite_height)
                         if sim_rect.collidepoint(mouse_x, mouse_y):
                              # Calculate distance for tie-breaking if multiple sprites overlap
                              dist_sq = (sim.x - mouse_x)**2 + (sim.y - mouse_y)**2
@@ -239,7 +242,7 @@ def main():
             all_sims_list = list(sims_dict.values()) # Get list for passing to update
             for sim in all_sims_list:
                 # Pass city.TILE_SIZE to sim.update for arrival checks
-                sim.update(dt, city, weather.current_state, all_sims_list, logger, current_sim_time, TILE_SIZE, config['movement']['direction_change_frequency']) # Use imported TILE_SIZE
+                sim.update(dt, city, weather.current_state, all_sims_list, logger, current_sim_time, TILE_SIZE, config.get('movement', {}).get('direction_change_frequency', 5.0)) # Use imported TILE_SIZE and safe config access
                 # Interaction check is now called within sim.update, remove explicit call here
             #   sim._check_interactions(sims, logger, current_sim_time) # Removed redundant call
             weather.update(dt)

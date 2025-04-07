@@ -21,5 +21,17 @@
   "weather": {
     "enable_weather_changes": true,
     "weather_change_frequency": 60.0
+  },
+  "sim": {
+    "sim_color": [255, 255, 255],
+    "sprite_width": 32,
+    "sprite_height": 32,
+    "interaction_distance": 20,
+    "sim_radius": 5,
+    "personality": {
+      "num_traits": 3,
+      "num_hobbies": 3,
+      "num_quirks": 2
+    }
   }
 }
