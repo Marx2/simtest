@@ -1,66 +1,110 @@
-# Plan: Centralize Configuration Reading
+# AI Sims Simulation - Project Plan
 
-**Objective:** Refactor the `aisim` project to read configuration from `aisim/config/config.json` using a single, centralized module, eliminating duplicate code and improving maintainability.
+## Overview
 
-**Current Situation:** Configuration loading logic (reading `config.json`, handling errors, setting defaults) is duplicated in:
-*   `aisim/src/main.py`
-*   `aisim/src/ai/ollama_client.py`
-*   `aisim/src/core/city.py`
+A single-player 2D life simulation game where AI-driven Sims live autonomously in a dynamic city. Sims perform daily activities, interact with each other, and respond to weather conditions, relationships, and memories. The simulation is scalable, supporting adjustable population size, city expansion, and time control. Sims use local AI models (Ollama) for conversations and decision-making.
 
-**Proposed Solution:**
+## Features
 
-1.  **Create a New Configuration Module:**
-    *   Create a new file: `aisim/src/core/configuration.py`.
-    *   Inside this file, define a class `ConfigManager`.
-    *   The `ConfigManager` class will:
-        *   Define the correct, constant path to `aisim/config/config.json`.
-        *   Load the configuration from the JSON file during initialization (`__init__`).
-        *   Implement robust error handling for `FileNotFoundError` and `json.JSONDecodeError`. If the file is missing or invalid, it will log a warning and store an empty dictionary or minimal defaults.
-        *   Store the loaded configuration data in an instance variable (e.g., `self._config_data`).
-        *   Provide a method `get_entry(self, key_path, default=None)`:
-            *   Accepts a `key_path` string (e.g., `"simulation.fps"`) or a list of keys (e.g., `["simulation", "fps"]`) to access nested values.
-            *   Safely navigates the loaded configuration data.
-            *   Returns the requested value, or the provided `default` value if the key path is invalid or the key doesn't exist.
-    *   Create a single instance of `ConfigManager` within the module (e.g., `config_manager = ConfigManager()`) that other modules can import and use.
+1.  **City Simulation & Movement**
 
-2.  **Refactor Existing Modules:**
-    *   **`aisim/src/main.py`**:
-        *   Remove the `CONFIG_PATH` constant and the `load_config` function.
-        *   Import the `config_manager` instance from `aisim.src.core.configuration`.
-        *   Replace all configuration access (e.g., `config.get(...)`, `simulation_config.get(...)`) with calls to `config_manager.get_entry(...)`, providing appropriate key paths and default values.
-    *   **`aisim/src/ai/ollama_client.py`**:
-        *   Remove the `CONFIG_PATH` constant and the `_load_config` method.
-        *   Remove the `self.config` attribute and its initialization.
-        *   Import the `config_manager` instance.
-        *   Replace all accesses to `self.config[...]` with calls to `config_manager.get_entry(...)`.
-    *   **`aisim/src/core/city.py`**:
-        *   Remove the `CONFIG_PATH` constant and the `_load_config` method.
-        *   Remove the `self.config` attribute and its initialization.
-        *   Import the `config_manager` instance.
-        *   Replace all accesses to `self.config[...]` with calls to `config_manager.get_entry(...)`. Handle specific type conversions (like list to tuple for colors) *after* retrieving the value.
-    *   **`aisim/src/core/movement.py`**:
-        *   Remove the unused `CONFIG_PATH` constant.
-        *   No direct changes needed within this file's functions, as configuration values are passed in.
+    *   2D city layout with streets, buildings, workplaces, and public areas.
+    *   Sims navigate using pathfinding algorithms (A* or Dijkstra’s algorithm).
+    *   Daily routines: work, leisure, home activities.
+    *   Scalability: Small towns → Large cities.
 
-**Visualization:**
+2.  **AI-Powered Sims (Generative Agents)**
 
-```mermaid
-graph TD
-    subgraph Before
-        M[main.py] -- reads --> C(config.json)
-        O[ollama_client.py] -- reads --> C
-        CT[city.py] -- reads --> C
-        MV[movement.py] -- uses config from --> M
-    end
+    *   Memory-based decision-making (past experiences, **long-term goals, and personality traits** influence behavior).
+    *   Local AI (Ollama) generates conversations and thoughts.
+    *   Sims form friendships, rivalries, **family ties, and romantic interests** dynamically.
+    *   Mood system affects interactions and daily choices.
 
-    subgraph After
-        CM[configuration.py] -- reads --> C2(config.json)
-        M2[main.py] -- imports & uses --> CM
-        O2[ollama_client.py] -- imports & uses --> CM
-        CT2[city.py] -- imports & uses --> CM
-        MV2[movement.py] -- uses config from --> M2
-    end
+3.  **Social Dynamics & Relationships**
 
-    style C fill:#f9f,stroke:#333,stroke-width:2px
-    style C2 fill:#f9f,stroke:#333,stroke-width:2px
-    style CM fill:#ccf,stroke:#333,stroke-width:2px
+    *   Friendship & Reputation System: Sims remember past interactions.
+    *   Gossip & Rumors: Reputation spreads within social circles.
+    *   Personality Traits: Each Sim has unique behavior (shy, outgoing, aggressive, etc.).
+    *   Group Interactions: Sims form social groups and attend events.
+
+4.  **Weather System**
+
+    *   Dynamic Weather: Sunny, Rainy, Snowy, Cloudy.
+    *   Impact on Sims:
+        *   Rain makes Sims use umbrellas or stay indoors.
+        *   Heatwaves encourage seeking shade or drinking cold beverages.
+        *   Snow slows movement and encourages indoor activities.
+    *   Weather Animation & Transitions
+
+5.  **UI & Simulation Controls**
+
+    *   Time Controls: Pause, Play, Fast-Forward (2x, 4x, 10x speed).
+    *   Adjustable Settings:
+        *   Weather Intensity
+        *   Population Size
+        *   AI Behavior Tuning (Social Interaction Frequency, Personality Diversity)
+    *   Data Visualization & Analytics:
+        *   Graphs & Charts:
+            *   **Happiness Trends**
+            *   **Social Network Map**
+    *   Event Logs: Displays major events & memory-based decisions.
+    *   Sim Names: Each Sim has a realistic first and last name.
+    *   Wrapped Thought Bubbles: Thought bubbles wrap text to fit within a reasonable width.
+    *   Buildings: The city map includes visible buildings.
+6.  **Scalability & Performance**
+
+    *   Adjustable number of Sims (from small neighborhoods to large-scale cities).
+    *   Procedural city expansion to support growing populations.
+    *   Multithreading & Optimization:
+        *   Sims run in parallel for large-scale simulation.
+        *   AI processing (Ollama) handled asynchronously.
+
+7. **Graphics**
+
+    *   Visual style based on the provided image and assets in `aisim/static_dirs/`.
+    *   **Sims:**
+        *   Use character sprites from `aisim/static_dirs/assets/characters/profile/` for Sim representation.
+        *   Potentially use base sprites from `aisim/static_dirs/assets/characters/` for animations (walking, etc.).
+    *   **Environment:**
+        *   Use tilesets from `aisim/static_dirs/assets/the_ville/visuals/map_assets/v3/` for the base terrain (grass, paths).
+        *   Use building and prop assets from `aisim/static_dirs/assets/the_ville/visuals/map_assets/` (potentially `v1` or `v2` for interiors/furniture).
+    *   **UI:**
+        *   Implement speech bubbles using images from `aisim/static_dirs/assets/speech_bubble/`.
+        *   Display character names above sprites.
+    *   **Map Structure:**
+        *   Implement a more structured tile map generation to create roads, buildings, and green spaces.
+
+
+
+
+
+
+## Tech Stack
+
+*   Language: Python (Conda virtual environment)
+*   Graphics Engine: Pygame
+*   AI Models: Ollama (local execution)
+*   Pathfinding: NetworkX, A* Algorithm
+*   Data Visualization: Matplotlib
+*   Multithreading: Python threading for large-scale Sims
+
+## Development Plan
+
+1.  Phase 1: Core Simulation Framework
+2.  Phase 2: AI Sims & Social System
+3.  Phase 3: UI & Control Features
+4.  Phase 4: Scalability & Optimization
+
+## Final Notes
+
+*   No multiplayer or modding (pure single-player simulation).
+*   Focus on realistic AI behavior & emergent storytelling.
+*   The game should run efficiently even with hundreds of Sims in a large city.
+
+## Next Steps
+
+*   Set up the project structure & initial Conda environment.
+*   Implement core simulation with Sims, movement, and weather.
+*   Expand AI interactions, relationships, and social dynamics.
+*   Develop UI controls & data visualization features.
+*   Optimize for large-scale simulations.
