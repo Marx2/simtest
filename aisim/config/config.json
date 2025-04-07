@@ -22,7 +22,14 @@
   },
   "weather": {
     "enable_weather_changes": true,
-    "weather_change_frequency": 60.0
+    "weather_change_frequency": 60.0,
+    "states": ["Sunny", "Cloudy", "Rainy", "Snowy"],
+    "colors": {
+        "Sunny": [135, 206, 250],
+        "Cloudy": [169, 169, 169],
+        "Rainy": [100, 100, 100],
+        "Snowy": [200, 200, 200]
+    }
   },
   "ui": {
       "text_color": [240, 240, 240],

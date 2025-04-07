@@ -4,24 +4,40 @@ import pygame
 class Weather:
     """Manages the simulation's weather system."""
 
-    STATES = ["Sunny", "Cloudy", "Rainy", "Snowy"]
-    # Basic colors for visualization
-    COLORS = {
-        "Sunny": (135, 206, 250),  # Sky Blue
-        "Cloudy": (169, 169, 169),  # Dark Gray
-        "Rainy": (100, 100, 100),   # Darker Gray
-        "Snowy": (200, 200, 200)   # Light Gray
-    }
+    def __init__(self, config, screen_width, screen_height):
+        """Initializes the weather system using simulation config."""
+        self.states = config.get('weather', {}).get('states', ["Sunny", "Cloudy", "Rainy", "Snowy"])
+        self.colors = {
+            state: tuple(color)
+            for state, color in config.get('weather', {}).get('colors', {
+                "Sunny": [135, 206, 250],
+                "Cloudy": [169, 169, 169],
+                "Rainy": [100, 100, 100],
+                "Snowy": [200, 200, 200]
+            }).items()
+        }
     # TRANSITION_TIME = 10.0 # Removed, now loaded from config
 
     def __init__(self, config, screen_width, screen_height):
         """Initializes the weather system using simulation config."""
         self.config = config
         self.weather_config = self.config.get('weather', {})
-        self.change_frequency = self.weather_config.get('weather_change_frequency', 60.0) # How often weather *can* change
-        self.transition_duration = self.config.get('simulation', {}).get('weather_transition_time', 1.0) # How long visual transition takes (default 1s)
+        self.change_frequency = self.weather_config.get('weather_change_frequency', 60.0)
+        self.transition_duration = self.config.get('simulation', {}).get('weather_transition_time', 1.0)
+        
+        # Initialize states and colors from config
+        self.states = self.weather_config.get('states', ["Sunny", "Cloudy", "Rainy", "Snowy"])
+        self.colors = {
+            state: tuple(color)
+            for state, color in self.weather_config.get('colors', {
+                "Sunny": [135, 206, 250],
+                "Cloudy": [169, 169, 169],
+                "Rainy": [100, 100, 100],
+                "Snowy": [200, 200, 200]
+            }).items()
+        }
 
-        self.current_state = random.choice(self.STATES)
+        self.current_state = random.choice(self.states)
         self.time_since_last_change = 0.0
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -47,7 +63,7 @@ class Weather:
             self.time_since_last_change = 0.0
             old_state = self.current_state
             # Avoid immediately switching back to the same state
-            possible_new_states = [s for s in self.STATES if s != old_state]
+            possible_new_states = [s for s in self.states if s != old_state]
             self.current_state = random.choice(possible_new_states)
             print(f"Weather changed from {old_state} to {self.current_state}")  # Log change
             # Start transition effect
@@ -69,7 +85,7 @@ class Weather:
     def get_current_color(self):
         """Returns the background color for the current weather."""
         # Base color remains the same, effects are overlays
-        return self.COLORS.get(self.current_state, (0, 0, 0)) # Default to black
+        return self.colors.get(self.current_state, (0, 0, 0)) # Default to black
 
     def _update_effects(self, dt):
         """Updates the state of ongoing effects like rain."""
