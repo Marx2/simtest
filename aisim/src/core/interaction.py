@@ -218,7 +218,7 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
         city.active_conversation_partners.remove(self.sim_id)
         print(f"Sim {self.sim_id} removed from active conversations.")
 
-def handle_ollama_response(self, response_text: str, current_time: float, all_sims: List['Sim']):
+def handle_ollama_response(self, response_text: str, current_time: float, all_sims: List['Sim'], city):
     """Handles a response received from Ollama."""
     print(f"Sim {self.sim_id}: Received Ollama response: '{response_text}'")
     self.waiting_for_ollama_response = False # No longer waiting
@@ -246,7 +246,7 @@ def handle_ollama_response(self, response_text: str, current_time: float, all_si
             print(f"Sim {self.sim_id}: Passed turn to {partner.sim_id}")
         else:
             print(f"Sim {self.sim_id}: ERROR - Partner {self.conversation_partner_id} not found during response handling!")
-            _end_interaction(self, city, all_sims) # Call as function with self parameter
+            _end_interaction(self, city, all_sims)
 
         # Update self
         self.is_my_turn_to_speak = False # Not my turn anymore
@@ -256,7 +256,7 @@ def handle_ollama_response(self, response_text: str, current_time: float, all_si
         # Check if max turns reached *after* this turn
         if self.conversation_turns >= config_manager.get_entry('ollama.conversation_max_turns', 6):
                 print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns after response.")
-                _end_interaction(self, city, all_sims) # Call as function with self parameter
+                _end_interaction(self, city, all_sims)
 
     else:
         # --- Handle Regular Thought ---

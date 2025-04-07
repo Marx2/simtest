@@ -244,7 +244,7 @@ def main():
                 if target_sim and response_text:
                     # Pass the response to the interaction module's handler method
                     from aisim.src.core import interaction
-                    interaction.handle_ollama_response(target_sim, response_text, current_sim_time, all_sims_list)
+                    interaction.handle_ollama_response(target_sim, response_text, current_sim_time, all_sims_list, city)
                 elif not target_sim:
                      print(f"Warning: Received Ollama result for unknown Sim ID: {sim_id}")
                 # The old direct setting of current_thought/thought_timer is now handled within handle_ollama_response

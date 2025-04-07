@@ -16,6 +16,7 @@ class OllamaClient:
         self.prompt_template = config_manager.get_entry('ollama.default_prompt_template', 'Default prompt: {situation}')
         self.conversation_prompt_template = config_manager.get_entry('ollama.conversation_prompt_template', self.prompt_template) # Fallback to default prompt template
         self.conversation_response_timeout = config_manager.get_entry('ollama.conversation_response_timeout', 30.0) # Default 30s
+        self.max_concurrent_requests = config_manager.get_entry('ollama.max_concurrent_requests', 1) # Read max concurrent requests
 
         self.client = ollama.Client(host=host)
         self.results_queue = queue.Queue() # Queue to store results from threads
@@ -86,11 +87,17 @@ class OllamaClient:
 
     def request_conversation_response(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]], personality_info: str) -> bool:
         """Requests a conversation response asynchronously, including personality description. Returns True if request started, False otherwise."""
+        # Check global concurrent request limit first
+        if len(self.active_requests) >= self.max_concurrent_requests:
+            # print(f"Sim {sim_id}: Cannot start conversation thread. Max concurrent requests ({self.max_concurrent_requests}) reached. Active: {self.active_requests}") # Debug
+            return False
+        # Then check if this specific sim already has a request
         if sim_id in self.active_requests:
-            # print(f"Ollama request already active for Sim {sim_id}. Ignoring new conversation request.") # Debug
+            # print(f"Sim {sim_id}: Ollama request already active. Ignoring new conversation request.") # Debug
             return False
 
         # print(f"Starting Ollama conversation worker thread for Sim {sim_id}") # Debug
+        print(f"Sim {sim_id}: Attempting to start conversation thread. Active requests: {self.active_requests}") # Added logging
         self.active_requests.add(sim_id)
         thread = threading.Thread(target=self._generate_conversation_worker, args=(sim_id, my_name, other_name, history, personality_info), daemon=True)
         thread.start()
