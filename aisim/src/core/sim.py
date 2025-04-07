@@ -11,6 +11,7 @@ from aisim.src.core.interaction import check_interactions, _end_interaction
 from aisim.src.core.city import TILE_SIZE  # Import TILE_SIZE constant
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, change_direction
 from aisim.src.core.movement import update as movement_update
+from aisim.src.core.panel import draw_bubble # Import the new function
 
 import os
 
@@ -29,37 +30,18 @@ def get_character_names():
 CHARACTER_NAMES = get_character_names()
 
 
-def wrap_text(text, font, max_width):
-    """Helper function to wrap text to fit within a specified width."""
-    words = text.split(' ')
-    lines = []
-    current_line = []
-
-    for word in words:
-        test_line = ' '.join(current_line + [word])
-        if font.size(test_line)[0] <= max_width:
-            current_line.append(word)
-        else:
-            lines.append(' '.join(current_line))
-            current_line = [word]
-
-    if current_line:
-        lines.append(' '.join(current_line))
-    return lines
-
-
+# wrap_text function removed, moved to panel.py
 # Constants
 SIM_COLOR = (255, 255, 255)  # White (fallback)
 SPRITE_WIDTH = 32  # Based on tile size
 SPRITE_HEIGHT = 32
 INTERACTION_DISTANCE = 20  # Max distance for interaction (pixels)
-THOUGHT_COLOR = (240, 240, 240)  # Light grey for thought text
-THOUGHT_BG_COLOR = (50, 50, 50, 180)  # Semi-transparent dark background
+# THOUGHT_COLOR and THOUGHT_BG_COLOR removed, defined in panel.py
 SIM_RADIUS = 5  # REMOVED
 
 # Initialize font - needs pygame.init() - Ensure font module is initialized
 pygame.font.init()
-SIM_FONT = pygame.font.SysFont(None, 18)  # Default system font, size 18
+# SIM_FONT removed, defined in panel.py
 
 # --- Personality Generation Setup ---
 ATTRIBUTES_FILE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'attributes.json')
@@ -500,44 +482,23 @@ class Sim:
             # Fallback: draw a colored circle
             pygame.draw.circle(screen, self.color, sim_pos, SIM_RADIUS)
 
-        # Draw thought bubble (if any)
+        # Draw conversation or thought bubble using the imported function
+        bubble_text = None
         if self.conversation_message:
-            # print(f"Drawing conversation bubble for Sim {self.sim_id}: {self.conversation_message}")
-            self.conversation_message_timer += 1
-            if self.conversation_message_timer < self.bubble_display_time:
-                self._draw_thought_bubble(screen, self.conversation_message, sim_pos)
+            # Increment timer only when message exists
+            self.conversation_message_timer += 1 # Assuming dt is 1 frame? If using actual dt, use that instead.
+            if self.conversation_message_timer < self.bubble_display_time: # Check against display time
+                 bubble_text = self.conversation_message
             else:
-                self.conversation_message = None # Clear message after time
-                self.conversation_message_timer = 0.0
-
+                 self.conversation_message = None # Clear message after time
+                 self.conversation_message_timer = 0.0 # Reset timer
         elif self.current_thought:
-            self._draw_thought_bubble(screen, self.current_thought, sim_pos)
+             # Handle non-conversation thought display timer (if needed, or remove if thoughts are transient)
+             # Assuming current_thought display is handled by its own timer logic elsewhere
+             bubble_text = self.current_thought
+
+        if bubble_text:
+            draw_bubble(screen, bubble_text, sim_pos) # Use the imported function
 
 
-    def _draw_thought_bubble(self, screen, text, sim_pos):
-        """Draws a thought bubble above the Sim."""
-        font = SIM_FONT
-        max_width = 150  # Maximum width of the thought bubble
-        lines = wrap_text(text, font, max_width)
-
-        # Calculate total height of the text block
-        line_height = font.get_linesize()
-        total_height = len(lines) * line_height
-
-        # Calculate bubble dimensions
-        bubble_width = max(font.size(line)[0] for line in lines) + 20  # Add padding
-        bubble_height = total_height + 20
-        bubble_x = sim_pos[0] - bubble_width // 2
-        bubble_y = sim_pos[1] - bubble_height - 30  # Position above Sim
-
-        # Draw bubble background
-        bubble_rect = pygame.Rect(bubble_x, bubble_y, bubble_width, bubble_height)
-        pygame.draw.rect(screen, THOUGHT_BG_COLOR, bubble_rect, border_radius=5)
-
-        # Draw each line of text
-        text_y = bubble_y + 10  # Starting Y position for text
-        for line in lines:
-            text_surface = font.render(line, True, THOUGHT_COLOR)
-            text_rect = text_surface.get_rect(center=(sim_pos[0], text_y))
-            screen.blit(text_surface, text_rect)
-            text_y += line_height  # Move to the next line
+    # _draw_thought_bubble method removed, functionality moved to panel.py
