@@ -303,7 +303,7 @@ class Sim:
        except Exception as e:
            print(f"Error loading sprite sheet: {e}")
            return "Unknown_Sim", None # Return a default name if loading fails
-    def draw(self, screen):
+    def draw(self, screen, dt):
         """Draws the Sim and its current thought on the screen."""
         sim_pos = (int(self.x), int(self.y))
 
@@ -321,9 +321,9 @@ class Sim:
         # Draw conversation or thought bubble using the imported function
         bubble_text = None
         if self.conversation_message:
-            # Increment timer only when message exists
-            self.conversation_message_timer += 1 # Assuming dt is 1 frame? If using actual dt, use that instead.
-            if self.conversation_message_timer < self.bubble_display_time: # Check against display time
+            # Decrement timer only when message exists
+            self.conversation_message_timer -= dt # Use delta time for consistent display
+            if self.conversation_message_timer > 0: # Check if timer still positive
                  bubble_text = self.conversation_message
             else:
                  self.conversation_message = None # Clear message after time
