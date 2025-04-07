@@ -135,42 +135,13 @@ class Sim:
         # print(f"Sim {self.sim_id}: update called at start, is_interacting={self.is_interacting}, interaction_timer={self.interaction_timer}, path={self.path}, target={self.target}, is_interacting={self.is_interacting}")
         # --- Conversation Logic ---
         if self.is_interacting:
-            self.interaction_timer += dt # Keep track of total interaction time if needed
-
-            # Check for conversation timeout (if waiting too long for a response)
-            if self.waiting_for_ollama_response and (current_time - self.conversation_last_response_time > self.ollama_client.conversation_response_timeout):
-                print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} timed out.")
-                _end_interaction(self, city, all_sims) # Call as function with self parameter
-                return # Stop further processing for this sim in this update
-
-            # Check for max turns reached
-            if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
-                 print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns.")
-                 _end_interaction(self, city, all_sims) # Call as function with self parameter
-                 return # Stop further processing
-
-            # If it's my turn and I'm not waiting for a response, request one
-            if self.is_my_turn_to_speak and not self.waiting_for_ollama_response:
-                partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-                if partner:
-                    print(f"Sim {self.sim_id}: Requesting conversation response (Turn {self.conversation_turns}). History: {self.conversation_history}")
-                    request_sent = self.ollama_client.request_conversation_response(
-                        self.sim_id,
-                        self.first_name,
-                        partner.first_name,
-                        self.conversation_history,
-                        self.personality_description # Pass pre-calculated description string
-                    )
-                    if request_sent:
-                        self.waiting_for_ollama_response = True
-                        self.conversation_last_response_time = current_time # Reset timeout timer
-                    else:
-                        print(f"Sim {self.sim_id}: Failed to send conversation request (maybe Ollama busy?).")
-                        # Optionally handle failure, e.g., end interaction after a few failed attempts
-                else:
-                     print(f"Sim {self.sim_id}: ERROR - Conversation partner {self.conversation_partner_id} not found!")
-                     _end_interaction(self, city, all_sims) # Call as function with self parameter
-                     return
+            # Handle conversation updates in a separate method
+            self.update_conversation(dt, city, all_sims, current_time)
+            # If the conversation ended within update_conversation, is_interacting might be False now.
+            # We might need to return early if _end_interaction was called inside update_conversation.
+            # Let's check if the sim is still interacting after the call.
+            if not self.is_interacting:
+                 return # Interaction ended, stop further processing in update
 
         # if logger:
         #     print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}")
@@ -178,6 +149,8 @@ class Sim:
             if not self.path:
                 target_x = random.randint(0, city.grid_width - 1) * TILE_SIZE
                 target_y = random.randint(0, city.grid_height - 1) * TILE_SIZE
+
+
                 self.path = get_path((self.x, self.y), (target_x, target_y), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
             if not self.path:  # Still no path (e.g., couldn't find one)
                 return
@@ -204,6 +177,50 @@ class Sim:
         # --- Log Mood ---
         if logger:
             logger.log_mood(current_time, self.sim_id, self.mood)
+    def update_conversation(self, dt, city, all_sims: List['Sim'], current_time):
+        """Handles the logic for ongoing conversations."""
+        # This method assumes self.is_interacting is True when called
+
+        self.interaction_timer += dt # Keep track of total interaction time if needed
+
+        # Check for conversation timeout (if waiting too long for a response)
+        # Note: Using self.ollama_client requires ollama_client to be passed or accessible
+        if self.waiting_for_ollama_response and (current_time - self.conversation_last_response_time > self.ollama_client.conversation_response_timeout):
+            print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} timed out.")
+            _end_interaction(self, city, all_sims) # Assumes _end_interaction is accessible globally or imported
+            return # Stop further processing within this method
+
+        # Check for max turns reached
+        # Note: Using self.ollama_client requires ollama_client to be passed or accessible
+        if self.conversation_turns >= self.ollama_client.config['ollama'].get('conversation_max_turns', 6):
+             print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns.")
+             _end_interaction(self, city, all_sims) # Assumes _end_interaction is accessible
+             return # Stop further processing within this method
+
+        # If it's my turn and I'm not waiting for a response, request one
+        if self.is_my_turn_to_speak and not self.waiting_for_ollama_response:
+            partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
+            if partner:
+                print(f"Sim {self.sim_id}: Requesting conversation response (Turn {self.conversation_turns}). History: {self.conversation_history}")
+                # Note: Using self.ollama_client requires ollama_client to be passed or accessible
+                request_sent = self.ollama_client.request_conversation_response(
+                    self.sim_id,
+                    self.first_name,
+                    partner.first_name,
+                    self.conversation_history,
+                    self.personality_description # Pass pre-calculated description string
+                )
+                if request_sent:
+                    self.waiting_for_ollama_response = True
+                    self.conversation_last_response_time = current_time # Reset timeout timer
+                else:
+                    print(f"Sim {self.sim_id}: Failed to send conversation request (maybe Ollama busy?).")
+                    # Optionally handle failure, e.g., end interaction after a few failed attempts
+            else:
+                 print(f"Sim {self.sim_id}: ERROR - Conversation partner {self.conversation_partner_id} not found!")
+                 _end_interaction(self, city, all_sims) # Assumes _end_interaction is accessible
+                 return # Stop further processing within this method
+
 
     def _find_sim_by_id(self, sim_id_to_find: any, all_sims: List['Sim']) -> Optional['Sim']:
         """Helper to find a Sim object by its ID."""
@@ -211,8 +228,6 @@ class Sim:
             if sim.sim_id == sim_id_to_find:
                 return sim
         return None
-
-
 
     def update_animation(self, dt):
         """Updates the animation frame based on elapsed time."""
