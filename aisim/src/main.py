@@ -11,7 +11,7 @@ from aisim.src.core.weather import Weather
 from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
 from aisim.src.core.logger import Logger
 from aisim.src.ai.ollama_client import OllamaClient
-from aisim.src.core.bubble import bubble
+from aisim.src.core.panel import wrap_text
 from aisim.src.core.mood import get_mood_description
 from aisim.src.core import interaction
 
@@ -264,7 +264,7 @@ def main():
 
             # Height for Personality
             estimated_content_height += line_h_log # Title
-            pers_lines = bubble.wrap_text(detailed_sim.personality_description, log_font, panel_width - 2 * padding - scrollbar_width)
+            pers_lines = wrap_text(detailed_sim.personality_description, log_font, panel_width - 2 * padding - scrollbar_width)
             estimated_content_height += len(pers_lines) * line_h_log + line_spacing
 
             # Height for Relationships
