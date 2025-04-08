@@ -1,27 +1,24 @@
 import pygame
 import os
 import sys
-print(f"Current working directory: {os.getcwd()}")
-print(f"Python sys.path: {sys.path}")
 import sys
 import random
 import uuid
-import json
-import textwrap # Added for panel text wrapping
-# Keep os import if needed elsewhere, otherwise remove if only used for CONFIG_PATH
 import os
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 from aisim.src.core.sim import Sim # Import Sim class (constants are now internal or loaded from config)
 from aisim.src.core.weather import Weather
 from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
-from aisim.src.ai.ollama_client import OllamaClient
-from aisim.src.core.logger import Logger
 from aisim.src.core.interaction import THOUGHT_DURATION # Added import
+from aisim.src.core.logger import Logger
+from aisim.src.ai.ollama_client import OllamaClient
+print(f"Current working directory: {os.getcwd()}")
+print(f"Python sys.path: {sys.path}")
 # Constants (Defaults, will be overridden by config)
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-WINDOW_TITLE = "AI Sims Simulation"
-FPS = 60 # Keep default FPS if needed before config load, otherwise remove
+SCREEN_WIDTH = config_manager.get_entry('simulation.screen_width', 800) # Default width
+SCREEN_HEIGHT = config_manager.get_entry('simulation.screen_height', 600) # Default height
+WINDOW_TITLE = config_manager.get_entry('simulation.window_title', "AI Simulation") # Default title
+FPS = config_manager.get_entry('simulation.fps', 60) # Default FPS
 
 # --- Helper Functions ---
 def wrap_text(text, font, max_width):

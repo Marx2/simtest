@@ -61,6 +61,10 @@
     "grid_color": [40, 40, 40],
     "tileset_path": "aisim/src/graphics/v3",
     "tile_size": 32,
-    "debug_border": false
+    "debug_border": false,
+    "screen_width": 800,
+    "screen_height": 600,
+    "fps": 60,
+    "window_title": "AI Life Simulation"
   }
 }
