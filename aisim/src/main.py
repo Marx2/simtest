@@ -19,7 +19,6 @@ print(f"Python sys.path: {sys.path}")
 SCREEN_WIDTH = config_manager.get_entry('simulation.screen_width', 800) # Default width
 SCREEN_HEIGHT = config_manager.get_entry('simulation.screen_height', 600) # Default height
 WINDOW_TITLE = config_manager.get_entry('simulation.window_title', "AI Simulation") # Default title
-FPS = config_manager.get_entry('simulation.fps', 60) # Default FPS
 
 def main():
     # Get config values using the centralized manager
