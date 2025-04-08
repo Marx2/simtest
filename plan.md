@@ -1,110 +1,79 @@
-# AI Sims Simulation - Project Plan
+# Plan: Refactor Sim Personality Handling
 
-## Overview
+This plan outlines the steps to refactor how Sim personality descriptions are handled in the `aisim` project. The goal is to store detailed personality data in individual files, generate descriptions using Ollama when needed, and load from files otherwise.
 
-A single-player 2D life simulation game where AI-driven Sims live autonomously in a dynamic city. Sims perform daily activities, interact with each other, and respond to weather conditions, relationships, and memories. The simulation is scalable, supporting adjustable population size, city expansion, and time control. Sims use local AI models (Ollama) for conversations and decision-making.
+**Phase 1: Configuration & Ollama Client Update**
 
-## Features
+1.  **Modify `aisim/config/config.json`:**
+    *   Add a new key `personality_prompt_template`. This template will guide Ollama in generating the description. It needs placeholders for the structured personality details and the Sim's sex.
+    *   *Example Template:*
+        ```json
+        "personality_prompt_template": "Based on the following details:\nSex: {sex}\n{personality_details}\n\nWrite a brief, engaging personality description for this character in the second person (e.g., 'You are...'). Focus on the most salient traits and motivations."
+        ```
+2.  **Modify `aisim/src/ai/ollama_client.py`:**
+    *   In the `__init__` method, load the new `personality_prompt_template` from the `config_manager`. Add validation to ensure the necessary placeholders (`{sex}`, `{personality_details}`) are present.
+    *   Create a new **synchronous** method: `calculate_personality_description(self, personality_data: Dict, sex: str) -> str`.
+        *   This method will receive the structured `personality_data` dictionary and the `sex` string.
+        *   It will format the `personality_data` into a readable string (potentially adapting `_format_personality_for_prompt` from `personality.py`).
+        *   It will populate the `personality_prompt_template` with the formatted details and sex.
+        *   It will make a **synchronous** call to `self.client.generate(...)` using the populated prompt.
+        *   It will handle the response, perform basic cleanup, and return the generated description string.
+        *   It will include `try...except` blocks to catch potential errors during the Ollama API call and return a default error message (e.g., "Could not generate personality description.") if it fails.
 
-1.  **City Simulation & Movement**
+**Phase 2: Core Logic Update**
 
-    *   2D city layout with streets, buildings, workplaces, and public areas.
-    *   Sims navigate using pathfinding algorithms (A* or Dijkstra’s algorithm).
-    *   Daily routines: work, leisure, home activities.
-    *   Scalability: Small towns → Large cities.
+3.  **Modify `aisim/src/core/sim.py`:**
+    *   **Imports:** Add `import os` and `import json` at the top.
+    *   **Personalities Directory:** Define the path `PERSONALITIES_DIR = "aisim/personalities"`.
+    *   **Refactor `Sim.__init__`:**
+        *   Remove the old direct calls to `_generate_personality` and `_format_personality_for_prompt` for setting `self.personality` and `self.personality_description`.
+        *   **Ensure Directory Exists:** Add `os.makedirs(PERSONALITIES_DIR, exist_ok=True)` near the start of the personality handling section.
+        *   **Construct File Path:** `personality_file = os.path.join(PERSONALITIES_DIR, f"{self.character_name}.json")`.
+        *   **Implement Load or Generate Logic:**
+            *   Check if `personality_file` exists.
+            *   If yes: Try to load JSON, assign `self.personality` and `self.personality_description`. Handle `FileNotFoundError`, `JSONDecodeError`, `KeyError` by falling back to generation.
+            *   If no (or loading failed): Generate structured personality (`_generate_personality`), call `ollama_client.calculate_personality_description` (synchronously), assign results, and save to file using a helper method.
+    *   **(Recommended) Add Helper Method `_save_personality` to `Sim` class:**
+        *   Takes `file_path` as an argument.
+        *   Creates a dictionary with `personality` and `personality_description`.
+        *   Uses `json.dump` to write the dictionary to the `file_path` with indentation.
+        *   Includes `try...except` for `IOError`.
 
-2.  **AI-Powered Sims (Generative Agents)**
+**Phase 3: Testing and Refinement**
 
-    *   Memory-based decision-making (past experiences, **long-term goals, and personality traits** influence behavior).
-    *   Local AI (Ollama) generates conversations and thoughts.
-    *   Sims form friendships, rivalries, **family ties, and romantic interests** dynamically.
-    *   Mood system affects interactions and daily choices.
+4.  **Testing:**
+    *   Delete any existing `aisim/personalities/` directory.
+    *   Run the simulation.
+    *   Verify `aisim/personalities/` directory and `.json` files are created.
+    *   Inspect JSON files for correct structure and content (structured data + Ollama description).
+    *   Restart simulation and verify personalities are loaded from files (check logs/output).
+    *   Monitor for errors during file I/O or Ollama calls.
 
-3.  **Social Dynamics & Relationships**
+**Visual Plan (Mermaid):**
 
-    *   Friendship & Reputation System: Sims remember past interactions.
-    *   Gossip & Rumors: Reputation spreads within social circles.
-    *   Personality Traits: Each Sim has unique behavior (shy, outgoing, aggressive, etc.).
-    *   Group Interactions: Sims form social groups and attend events.
+```mermaid
+graph TD
+    A[Start Sim __init__] --> B(Define Personalities Dir & File Path);
+    B --> C{Personality File Exists?};
+    C -- Yes --> D[Try Loading JSON];
+    D -- Success --> E[Assign self.personality & self.description from File];
+    D -- Failure --> F[Log Error];
+    C -- No --> G[Generate Structured Personality (`_generate_personality`)];
+    F --> G;
+    G --> H[Call OllamaClient.calculate_personality_description (Sync)];
+    H --> I[Assign self.personality & self.description from Generation];
+    I --> J[Try Saving Personality to JSON File];
+    E --> K[Continue Sim Initialization];
+    J --> K;
 
-4.  **Weather System**
+    subgraph OllamaClient
+        L[calculate_personality_description Method]
+        M[Format Data + Get Template]
+        N[Format Prompt]
+        O[Call Ollama API (Sync)]
+        P[Handle Response/Error]
+        Q[Return Description String]
+        M --> N --> O --> P --> Q
+    end
 
-    *   Dynamic Weather: Sunny, Rainy, Snowy, Cloudy.
-    *   Impact on Sims:
-        *   Rain makes Sims use umbrellas or stay indoors.
-        *   Heatwaves encourage seeking shade or drinking cold beverages.
-        *   Snow slows movement and encourages indoor activities.
-    *   Weather Animation & Transitions
-
-5.  **UI & Simulation Controls**
-
-    *   Time Controls: Pause, Play, Fast-Forward (2x, 4x, 10x speed).
-    *   Adjustable Settings:
-        *   Weather Intensity
-        *   Population Size
-        *   AI Behavior Tuning (Social Interaction Frequency, Personality Diversity)
-    *   Data Visualization & Analytics:
-        *   Graphs & Charts:
-            *   **Happiness Trends**
-            *   **Social Network Map**
-    *   Event Logs: Displays major events & memory-based decisions.
-    *   Sim Names: Each Sim has a realistic first and last name.
-    *   Wrapped Thought Bubbles: Thought bubbles wrap text to fit within a reasonable width.
-    *   Buildings: The city map includes visible buildings.
-6.  **Scalability & Performance**
-
-    *   Adjustable number of Sims (from small neighborhoods to large-scale cities).
-    *   Procedural city expansion to support growing populations.
-    *   Multithreading & Optimization:
-        *   Sims run in parallel for large-scale simulation.
-        *   AI processing (Ollama) handled asynchronously.
-
-7. **Graphics**
-
-    *   Visual style based on the provided image and assets in `aisim/static_dirs/`.
-    *   **Sims:**
-        *   Use character sprites from `aisim/static_dirs/assets/characters/profile/` for Sim representation.
-        *   Potentially use base sprites from `aisim/static_dirs/assets/characters/` for animations (walking, etc.).
-    *   **Environment:**
-        *   Use tilesets from `aisim/static_dirs/assets/the_ville/visuals/map_assets/v3/` for the base terrain (grass, paths).
-        *   Use building and prop assets from `aisim/static_dirs/assets/the_ville/visuals/map_assets/` (potentially `v1` or `v2` for interiors/furniture).
-    *   **UI:**
-        *   Implement speech bubbles using images from `aisim/static_dirs/assets/speech_bubble/`.
-        *   Display character names above sprites.
-    *   **Map Structure:**
-        *   Implement a more structured tile map generation to create roads, buildings, and green spaces.
-
-
-
-
-
-
-## Tech Stack
-
-*   Language: Python (Conda virtual environment)
-*   Graphics Engine: Pygame
-*   AI Models: Ollama (local execution)
-*   Pathfinding: NetworkX, A* Algorithm
-*   Data Visualization: Matplotlib
-*   Multithreading: Python threading for large-scale Sims
-
-## Development Plan
-
-1.  Phase 1: Core Simulation Framework
-2.  Phase 2: AI Sims & Social System
-3.  Phase 3: UI & Control Features
-4.  Phase 4: Scalability & Optimization
-
-## Final Notes
-
-*   No multiplayer or modding (pure single-player simulation).
-*   Focus on realistic AI behavior & emergent storytelling.
-*   The game should run efficiently even with hundreds of Sims in a large city.
-
-## Next Steps
-
-*   Set up the project structure & initial Conda environment.
-*   Implement core simulation with Sims, movement, and weather.
-*   Expand AI interactions, relationships, and social dynamics.
-*   Develop UI controls & data visualization features.
-*   Optimize for large-scale simulations.
+    H --> L;

@@ -25,7 +25,10 @@ class OllamaClient:
         # Verify the conversation template has the required placeholders
         if not all(k in self.conversation_prompt_template for k in ['{my_name}', '{other_name}', '{history}', '{personality_info}']):
              print("Warning: conversation_prompt_template might be missing required placeholders ({my_name}, {other_name}, {history}, {personality_info})")
-
+        # Load personality prompt template and verify placeholders
+        self.personality_prompt_template = config_manager.get_entry('ollama.personality_prompt_template', 'Write a personality description.')
+        if not all(k in self.personality_prompt_template for k in ['{sex}', '{personality_details}']):
+            print("Warning: personality_prompt_template might be missing required placeholders ({sex}, {personality_details})")
 
     # Removed _load_config method as configuration is now handled by ConfigManager
     def _generate_worker(self, sim_id, situation_description):
@@ -125,3 +128,69 @@ class OllamaClient:
         except Exception as e:
             print(f"Error communicating with Ollama (sync): {e}")
             return f"({self.model} unavailable)"
+
+    def calculate_personality_description(self, personality_data: Dict, sex: str) -> str:
+        """Generates a personality description synchronously using the Ollama API."""
+        try:
+            # Format personality data into a string
+            # Use the helper method defined below
+            personality_details = self._format_personality_data(personality_data, sex)
+
+            # Format the prompt using the template
+            prompt = self.personality_prompt_template.format(sex=sex, personality_details=personality_details)
+
+            # Call the Ollama API
+            response = self.client.generate(model=self.model, prompt=prompt, stream=False)
+            description = response.get('response', '').strip()
+            return description
+        except Exception as e:
+            print(f"Error generating personality description: {e}")
+            return "Could not generate personality description."
+
+    def _format_personality_data(self, personality: Dict, sex: str) -> str:
+        """Formats the personality dictionary into a readable string for the LLM prompt.
+        Adapted from aisim.src.core.personality._format_personality_for_prompt"""
+        lines = [f"Sex: {sex}"]  # Add sex at the beginning
+        if traits := personality.get("personality_traits"):
+            lines.append(f"- Traits: {', '.join(traits)}")
+        if motivation := personality.get("motivation"):
+            lines.append(f"- Motivation: {motivation}")
+        if hobbies := personality.get("hobbies"):
+            lines.append(f"- Hobbies: {', '.join(hobbies)}")
+
+        if emo_profile := personality.get("emotional_profile"):
+            emo_parts = []
+            if anxiety := emo_profile.get("anxiety"): emo_parts.append(f"Anxiety ({anxiety}/100)")
+            if impulse := emo_profile.get("impulse_control"): emo_parts.append(f"Impulse Control ({impulse}/100)")
+            if social := emo_profile.get("social_energy"): emo_parts.append(f"Social Energy ({social})")
+            if emo_parts: lines.append(f"- Emotional Profile: {', '.join(emo_parts)}")
+
+        if rom_profile := personality.get("romantic_profile"):
+            rom_parts = []
+            if orientation := rom_profile.get("orientation"): rom_parts.append(orientation)
+            if libido := rom_profile.get("libido"): rom_parts.append(f"{libido} Libido")
+            if kink := rom_profile.get("kinkiness"): rom_parts.append(f"{kink} Kinkiness")
+            if goal := rom_profile.get("relationship_goal"): rom_parts.append(f"{goal} Goal")
+            if rom_parts: lines.append(f"- Romantic Profile: {', '.join(rom_parts)}")
+
+        if cult_profile := personality.get("cultural_background"):
+            cult_parts = []
+            if eth := cult_profile.get("ethnicity"): cult_parts.append(eth)
+            if ses := cult_profile.get("socioeconomic_status"): cult_parts.append(ses)
+            if edu := cult_profile.get("education"): cult_parts.append(f"{edu} Educated")
+            if cult_parts: lines.append(f"- Background: {', '.join(cult_parts)}")
+
+        if career := personality.get("career_style"):
+            lines.append(f"- Career Style: {career}")
+
+        if life_habits := personality.get("lifestyle_habits"):
+            life_parts = []
+            if sleep := life_habits.get("sleep_schedule"): life_parts.append(sleep)
+            if clean := life_habits.get("cleanliness"): life_parts.append(clean)
+            if health := life_habits.get("health_focus"): life_parts.append(f"{health} Health Focus")
+            if life_parts: lines.append(f"- Habits: {', '.join(life_parts)}")
+
+        if quirks := personality.get("quirks"):
+            lines.append(f"- Quirks: {', '.join(quirks)}")
+
+        return "\n".join(lines)

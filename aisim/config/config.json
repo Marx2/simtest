@@ -6,10 +6,11 @@
     "conversation_prompt_template": "You are {my_name}, a character in a life simulation\nYou are talking to {other_name}. Continue the conversation based on this interpreted personality (considering your romantic/sexual profile) and the history. Keep your response concise (1 sentences).\n\nConversation History:\n{history}\nPersonality: {personality_info}:",
     "conversation_max_turns": 4,
     "conversation_response_timeout": 30.0,
-    "max_concurrent_requests": 1
+    "max_concurrent_requests": 1,
+    "personality_prompt_template": "Based on the following details:\\nSex: {sex}\\n{personality_details}\\n\\nWrite a brief, engaging personality description for this character in the second person (e.g., 'You are...'). Focus on the most salient traits and motivations."
   },
   "simulation": {
-    "initial_sims": 12,
+    "initial_sims": 10,
     "fps": 60,
     "enable_talking": true,
     "weather_transition_time": 15.0,
@@ -59,6 +60,6 @@
     "grid_color": [40, 40, 40],
     "tileset_path": "aisim/src/graphics/v3",
     "tile_size": 32,
-    "debug_border": true
+    "debug_border": false
   }
 }

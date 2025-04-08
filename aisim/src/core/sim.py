@@ -12,6 +12,7 @@ from aisim.src.core.personality import _assign_sex, _generate_personality, _form
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
 TILE_SIZE = config_manager.get_entry('city.tile_size', 32) # Add default value
+PERSONALITIES_DIR = "aisim/personalities" # Directory to store personality files
 
 # --- Load Attributes Data ---
 ATTRIBUTES_DATA = {} # Default empty
@@ -79,12 +80,14 @@ class Sim:
         self.path = None
         self.path_index = 0
         self.target = None
-        # --- Personality ---
-        self.personality = _generate_personality(ATTRIBUTES_DATA, sim_config.get("personality", {})) # Generate personality using imported function
-        self.personality_description = _format_personality_for_prompt(self.personality, self.sex) # Format personality using imported function
+        # --- Personality (Load or Generate) ---
+        self.ollama_client = ollama_client # Assign ollama_client earlier for use in personality gen
+        self.personality = {}
+        self.personality_description = "Personality not set."
+        self._load_or_generate_personality(sim_config)
         # --- End Personality ---
         self.memory = []  # List to store significant events or interactions
-        self.ollama_client = ollama_client
+        # self.ollama_client = ollama_client # Moved up
         self.current_thought = None
         self.thought_timer = 0.0
         self.relationships = {}  # Key: other_sim_id, Value: {"friendship": float, "romance": float}
@@ -354,3 +357,45 @@ class Sim:
 
             draw_bubble(screen, bubble_text, sim_pos) # Use the imported function
 
+
+    def _load_or_generate_personality(self, sim_config: Dict):
+        """Loads personality from file if exists, otherwise generates and saves it."""
+        os.makedirs(PERSONALITIES_DIR, exist_ok=True) # Ensure directory exists
+        personality_file = os.path.join(PERSONALITIES_DIR, f"{self.character_name}.json")
+
+        if os.path.exists(personality_file):
+            try:
+                with open(personality_file, 'r') as f:
+                    data = json.load(f)
+                self.personality = data.get("personality", {}) # Load structured data
+                self.personality_description = data.get("personality_description", "Error: Description missing in file.") # Load description
+                print(f"Loaded personality for {self.full_name} from {personality_file}")
+            except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+                print(f"Error loading personality for {self.full_name} from {personality_file}: {e}. Regenerating.")
+                # Fallback to generation if loading fails
+                self.personality = _generate_personality(ATTRIBUTES_DATA, sim_config.get("personality", {}))
+                self.personality_description = self.ollama_client.calculate_personality_description(self.personality, self.sex)
+                self._save_personality(personality_file) # Attempt to save the newly generated data
+        else:
+            print(f"Personality file not found for {self.full_name}. Generating...")
+            # Generate personality (structured)
+            self.personality = _generate_personality(ATTRIBUTES_DATA, sim_config.get("personality", {}))
+            # Generate description (via Ollama)
+            self.personality_description = self.ollama_client.calculate_personality_description(self.personality, self.sex)
+            # Save to file
+            self._save_personality(personality_file)
+
+    def _save_personality(self, file_path):
+        """Saves the current personality and description to a JSON file."""
+        data_to_save = {
+            "personality": self.personality,
+            "personality_description": self.personality_description
+        }
+        try:
+            # Ensure directory exists just before writing (redundant if called after _load_or_generate_personality, but safe)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'w') as f:
+                json.dump(data_to_save, f, indent=4)
+            print(f"Saved personality for {self.full_name} to {file_path}")
+        except IOError as e:
+            print(f"Error saving personality for {self.full_name} to {file_path}: {e}")
