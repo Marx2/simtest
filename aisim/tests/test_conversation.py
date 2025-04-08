@@ -23,7 +23,7 @@ class TestConversation(unittest.TestCase):
     @patch('aisim.src.core.sim.Sim._load_sprite_sheet')
     def test_sim_conversation(self, mock_load_sprite, mock_create_tile_map):
         # Mock OllamaClient and its response
-        mock_load_sprite.return_value = ("Test_Sim", MagicMock())
+        mock_load_sprite.return_value = ("Abigail_Chen", MagicMock())
         mock_create_tile_map.return_value = None
 
         response_text = "This is a test response from Ollama."
@@ -38,7 +38,7 @@ class TestConversation(unittest.TestCase):
             sim_config={},
             bubble_display_time=5.0
         )
-        sim1.first_name = "Alice"
+        sim1.first_name = "Abigail_Chen"
         sim1.personality_description = "Kind and helpful"
 
         sim2 = Sim(
@@ -50,7 +50,7 @@ class TestConversation(unittest.TestCase):
             sim_config={},
             bubble_display_time=5.0
         )
-        sim2.first_name = "Bob"
+        sim2.first_name = "Adam_Smith"
         sim2.personality_description = "Curious and friendly"
 
         # Create City instance
@@ -78,21 +78,19 @@ class TestConversation(unittest.TestCase):
     @patch('aisim.src.core.sim.Sim._load_sprite_sheet')
     def test_sim_conversation_ollama(self, mock_load_sprite, mock_create_tile_map):
         # This test uses the real Ollama client
-        mock_load_sprite.return_value = ("Test_Sim", MagicMock())
+        mock_load_sprite.return_value = ("Abigail_Chen", MagicMock())
         mock_create_tile_map.return_value = None
 
-        # Create Sim instances
+        # Create Sim instances - personalities will be loaded automatically
         sim1 = Sim(
             sim_id="sim1",
             x=10,
             y=20,
             ollama_client=self.ollama_client,
             enable_talking=True,
-            sim_config={},
+            sim_config={"character_name": "Abigail_Chen"},
             bubble_display_time=5.0
         )
-        sim1.first_name = "Alice"
-        sim1.personality_description = "What is your name?"
 
         sim2 = Sim(
             sim_id="sim2",
@@ -100,11 +98,9 @@ class TestConversation(unittest.TestCase):
             y=40,
             ollama_client=self.ollama_client,
             enable_talking=True,
-            sim_config={},
+            sim_config={"character_name": "Adam_Smith"},
             bubble_display_time=5.0
         )
-        sim2.first_name = "Bob"
-        sim2.personality_description = "My name is Bob"
 
         # Create City instance
         city = City(800, 600)

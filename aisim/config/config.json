@@ -54,7 +54,8 @@
     ],
     "attributes_file_path": "aisim/config/attributes.json",
     "character_sprite_dir": "aisim/src/graphics/characters",
-    "panel_font_dir": "aisim/src/graphics/fonts/NotoEmoji-Regular.ttf"
+    "panel_font_dir": "aisim/src/graphics/fonts/NotoEmoji-Regular.ttf",
+    "personalities_path": "aisim/personalities"
   },
   "city": {
     "grid_color": [40, 40, 40],

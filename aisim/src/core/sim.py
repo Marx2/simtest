@@ -12,7 +12,7 @@ from aisim.src.core.personality import _assign_sex, _generate_personality, _form
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
 TILE_SIZE = config_manager.get_entry('city.tile_size', 32) # Add default value
-PERSONALITIES_DIR = "aisim/personalities" # Directory to store personality files
+PERSONALITIES_DIR = config_manager.get_entry('sim.personalities_path') # Directory to store personality files
 
 # --- Load Attributes Data ---
 ATTRIBUTES_DATA = {} # Default empty
