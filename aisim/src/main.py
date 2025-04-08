@@ -200,7 +200,6 @@ def main():
         screen.blit(weather_surface, weather_rect)
 
         # Draw Weather Countdown Timer (Below Weather Status)
-        # Weather object now uses config_manager internally or was initialized with its config
         # Assuming Weather class is refactored or handles its config access internally
         if config_manager.get_entry('weather.enable_weather_changes', False): # Check directly via config_manager
             remaining_time = max(0, weather.change_frequency - weather.time_since_last_change)
@@ -248,11 +247,7 @@ def main():
                 SCREEN_WIDTH,
                 SCREEN_HEIGHT
             )
-
-
         pygame.display.flip() # Update the full display Surface to the screen
-        for sim in sims_dict.values(): # Iterate over dict values
-            sim.can_talk = True # Reset talking flag (consider if this is still needed)
 
 
     # --- End of main loop ---

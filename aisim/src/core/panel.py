@@ -51,8 +51,6 @@ def wrap_text(text, font, max_width):
         if current_line:
             lines.append(' '.join(current_line))
         # Add an empty line between paragraphs if the original text had one
-        if paragraph != paragraphs[-1]: # Don't add extra space after the last paragraph
-            lines.append("") # Add empty string to represent paragraph break
     # Ensure at least one line is returned if text was just whitespace
     if not lines and text.strip() == "":
         return [""]
