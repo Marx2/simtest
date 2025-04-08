@@ -3,7 +3,7 @@
     "host": "http://localhost:11434",
     "model": "phi4",
     "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble.",
-    "conversation_prompt_template": "You are {my_name}, a character in a life simulation. Below is your structured personality profile. Interpret these traits creatively to inform your behavior, tone, and dialogue choices, especially considering your romantic/sexual profile when relevant to the conversation.\n\n{personality_info}\n\nYou are talking to {other_name}. Continue the conversation based on this interpreted personality and the history. Keep your response concise (1-2 sentences).\n\nConversation History:\n{history}\n\n{my_name}:",
+    "conversation_prompt_template": "You are {my_name}, a character in a life simulation\nYou are talking to {other_name}. Continue the conversation based on this interpreted personality (considering your romantic/sexual profile) and the history. Keep your response concise (1 sentences).\n\nConversation History:\n{history}\nPersonality: {personality_info}:",
     "conversation_max_turns": 4,
     "conversation_response_timeout": 30.0,
     "max_concurrent_requests": 1
@@ -14,7 +14,7 @@
     "enable_talking": true,
     "weather_transition_time": 15.0,
     "ignore_interaction_time": 15.0,
-    "bubble_display_time_seconds": 5.0,
+    "bubble_display_time_seconds": 15.0,
     "interaction_distance": 40,
     "thought_duration": 5.0
   },

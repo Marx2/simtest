@@ -59,6 +59,7 @@ class OllamaClient:
             history=history_str,
             personality_info=personality_info # Use pre-formatted string
         )
+        print(f"Sim {sim_id}: {prompt}")
         result = None
         try:
             # Note: The ollama library itself doesn't have an explicit timeout for generate.
