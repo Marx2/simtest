@@ -179,8 +179,10 @@ def handle_ollama_response(self, response_text: str, current_time: float, all_si
         self.conversation_last_response_time = current_time # Reset timeout timer
 
         # Check if max turns reached *after* this turn
-        if self.conversation_turns >= config_manager.get_entry('ollama.conversation_max_turns', 6):
-                print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns after response.")
+        max_total_turns = config_manager.get_entry('ollama.conversation_max_turns', 4) # Use default consistent with config
+        max_turns_per_sim = max_total_turns // 2 # Integer division for turns per sim
+        if self.conversation_turns >= max_turns_per_sim:
+                print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns ({max_total_turns} total) after response.")
                 _end_interaction(self, city, all_sims)
 
     else:
