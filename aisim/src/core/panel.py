@@ -84,6 +84,9 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
     bubble_height = total_height + (2 * padding)
     bubble_x = position[0] - bubble_width // 2
     bubble_y = position[1] + offset_y - bubble_height # Position above the target point
+    screen_height = screen.get_height()
+    if bubble_y < 0:
+        bubble_y = 0
 
     # Draw bubble background
     bubble_rect = pygame.Rect(bubble_x, bubble_y, bubble_width, bubble_height)
