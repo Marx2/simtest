@@ -57,6 +57,7 @@ def main():
 
     current_sim_time = 0.0 # Track total simulation time passed
     selected_sim = None # Track the currently selected Sim (for bottom log)
+    selected_tile_info = None # Track the last clicked tile info
     detailed_sim = None # Track the Sim for the details panel
     last_click_time = 0
     last_clicked_sim_id = None
@@ -101,6 +102,7 @@ def main():
                             print(f"Double-clicked Sim: {clicked_on_sim_object.sim_id}")
                             detailed_sim = clicked_on_sim_object # Show details panel
                             selected_sim = clicked_on_sim_object # Also select for log view
+                            selected_tile_info = None # Clear tile info when selecting sim
                             panel_scroll_offset = 0 # Reset scroll on new panel
                             # Reset double-click tracking
                             last_click_time = 0
@@ -109,17 +111,40 @@ def main():
                             # --- Single Click on a Sim ---
                             print(f"Single-clicked Sim: {clicked_on_sim_object.sim_id}")
                             selected_sim = clicked_on_sim_object # Select for log view
+                            selected_tile_info = None # Clear tile info when selecting sim
                             detailed_sim = None # Close details panel on single click
                             # Update tracking for potential double-click
                             last_click_time = current_time_ms
                             last_clicked_sim_id = clicked_on_sim_object.sim_id
                     else:
                         # --- Clicked on Empty Space ---
-                        print("Clicked empty space")
                         selected_sim = None # Deselect for log view
                         detailed_sim = None # Close details panel
                         last_click_time = 0 # Reset double-click tracking
                         last_clicked_sim_id = None
+
+                        # Calculate tile coordinates from mouse position
+                        tile_col = mouse_x // TILE_SIZE
+                        tile_row = mouse_y // TILE_SIZE
+
+                        # Check if click is within grid bounds
+                        if 0 <= tile_row < city.grid_height and 0 <= tile_col < city.grid_width:
+                            tile_name = city.tile_map[tile_row][tile_col]
+                            tile_type = "unknown" # Default
+                            if tile_name:
+                                if tile_name.startswith('grass_'):
+                                    tile_type = "grass"
+                                elif tile_name.startswith('path_'):
+                                    tile_type = "path"
+                                elif tile_name.startswith('prop_'):
+                                    tile_type = "prop" # e.g., tree
+
+                            selected_tile_info = {'coords': (tile_col, tile_row), 'type': tile_type}
+                            print(f"Clicked empty space at tile {selected_tile_info['coords']} - Type: {selected_tile_info['type']}")
+                        else:
+                            selected_tile_info = None # Clicked outside grid
+                            print("Clicked empty space outside grid")
+
             elif event.type == pygame.MOUSEWHEEL:
                  # Handle panel scrolling only if the panel is open
                  if detailed_sim:
@@ -209,28 +234,46 @@ def main():
             screen.blit(countdown_surface, countdown_rect)
 
 
-        # Draw Event Log for selected Sim
+        # --- Display Info at Bottom Left (Sim Log or Tile Info) ---
+        log_y = SCREEN_HEIGHT - 15 # Base y position near bottom
+        log_x = 10                 # Base x position near left
+
         if selected_sim:
-            log_y = SCREEN_HEIGHT - 15 # Start near bottom
-            log_x = 10
-            # Display Sim ID
+            # --- Display Sim Info and Log ---
+            # Calculate position for the Sim ID text based on log count
+            num_logs = len(selected_sim.memory[-5:]) if selected_sim.memory else 0
+            info_y_pos = log_y - (num_logs + 1) * 15 # Position above logs
+
+            # Render and blit Sim ID text
             id_text = f"Selected: {selected_sim.full_name} (Mood: {selected_sim.mood:.2f})"
             id_surface = log_font.render(id_text, True, (255, 255, 255))
-            screen.blit(id_surface, (log_x, log_y - (len(selected_sim.memory[-5:]) + 1) * 15 )) # Position above logs
+            screen.blit(id_surface, (log_x, info_y_pos))
 
-        # Display last 5 memory entries
-        if selected_sim and selected_sim.memory:
-            for entry in selected_sim.memory[-5:]: # Get last 5 entries
-                entry_text = ""
-            entry_text = ""
-            if entry['type'] == 'thought':
-                    entry_text = f"[Thought] {entry['content'][:60]}..." # Truncate long thoughts
-            elif entry['type'] == 'interaction':
-                    entry_text = f"[Interact] w/ {entry['with_sim_id'][:6]} (F_chg: {entry['friendship_change']:.2f})"
+            # Display last 5 memory entries below the ID text
+            if selected_sim.memory:
+                current_log_y = log_y # Start drawing logs from the bottom-most line
+                for entry in selected_sim.memory[-5:]: # Get last 5 entries
+                    entry_text = ""
+                    if entry['type'] == 'thought':
+                            entry_text = f"[Thought] {entry['content'][:60]}..." # Truncate long thoughts
+                    elif entry['type'] == 'interaction':
+                            entry_text = f"[Interact] w/ {entry['with_sim_id'][:6]} (F_chg: {entry['friendship_change']:.2f})"
 
-            log_surface = log_font.render(entry_text, True, (200, 200, 200))
-            screen.blit(log_surface, (log_x, log_y))
-            log_y -= 15 # Move up for next line
+                    if entry_text: # Only render if there's text
+                        log_surface = log_font.render(entry_text, True, (200, 200, 200))
+                        screen.blit(log_surface, (log_x, current_log_y))
+                        current_log_y -= 15 # Move up for next line
+
+        elif selected_tile_info:
+            # --- Display Clicked Tile Info ---
+            coords = selected_tile_info['coords']
+            tile_type = selected_tile_info['type']
+            tile_text = f"Tile: {coords} - Type: {tile_type}"
+            tile_surface = log_font.render(tile_text, True, (255, 255, 255)) # Use log font
+
+            # Position one line up from the very bottom edge (similar to Sim ID when no logs)
+            info_y_pos = log_y - 15
+            screen.blit(tile_surface, (log_x, info_y_pos))
 
 
         # --- Draw Sim Details Panel ---
