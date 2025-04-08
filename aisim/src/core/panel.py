@@ -152,7 +152,7 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
 
 def draw_panel_details(screen, detailed_sim, panel_scroll_offset, sims_dict, ui_font, log_font, SCREEN_WIDTH, SCREEN_HEIGHT):
     """Draws the detailed information panel for a selected Sim."""
-    panel_width = 350
+    panel_width = 450
     panel_height = 450 # Increased height
     panel_x = (SCREEN_WIDTH - panel_width) // 2
     panel_y = (SCREEN_HEIGHT - panel_height) // 2
@@ -188,6 +188,19 @@ def draw_panel_details(screen, detailed_sim, panel_scroll_offset, sims_dict, ui_
          estimated_content_height += len(detailed_sim.relationships) * line_h_log
     else:
          estimated_content_height += line_h_log # "None" line
+    estimated_content_height += line_spacing # Space before next section
+
+    # Height for Memory (Last 10 entries)
+    estimated_content_height += line_h_log # Title
+    memory_to_display = detailed_sim.memory[-10:] # Get last 10
+    if memory_to_display:
+         # Assuming each memory entry is a string and takes one line for estimation
+         # More complex wrapping isn't estimated here for simplicity, but handled in drawing
+         estimated_content_height += len(memory_to_display) * line_h_log
+    else:
+         estimated_content_height += line_h_log # "None" line
+
+    estimated_content_height += padding # Bottom padding
     estimated_content_height += padding # Bottom padding
 
     # --- Clamp Scroll Offset ---
@@ -207,7 +220,6 @@ def draw_panel_details(screen, detailed_sim, panel_scroll_offset, sims_dict, ui_
 
     # --- Draw Content (with scroll offset) ---
     current_y = panel_y + padding - panel_scroll_offset # Apply scroll offset
-    content_width = panel_width - 2 * padding - scrollbar_width # Adjust width for scrollbar
 
     # Portrait
     portrait = detailed_sim.get_portrait()
@@ -318,6 +330,37 @@ def draw_panel_details(screen, detailed_sim, panel_scroll_offset, sims_dict, ui_
             no_rel_surf = log_font.render("- None", True, text_color)
             screen.blit(no_rel_surf, (panel_x + padding, current_y))
          current_y += line_h_log # Still advance Y
+
+    # Memory (Last 10 entries)
+    current_y += line_spacing # Add space before section
+    mem_title_surf = log_font.render("Memory (Last 10):", True, text_color)
+    screen.blit(mem_title_surf, (panel_x + padding, current_y))
+    current_y += line_h_log
+
+    memory_to_display = detailed_sim.memory[-10:] # Get last 10 entries
+    if memory_to_display:
+        content_width = panel_width - 2 * padding - scrollbar_width # Available width for text
+        for entry in memory_to_display:
+            # Wrap memory entry text if needed
+            wrapped_lines = wrap_text(str(entry), log_font, content_width) # Ensure entry is string
+            for line in wrapped_lines:
+                # Simple visibility checks like above
+                if current_y > panel_y + panel_height: break
+                if current_y + line_h_log < panel_y:
+                    current_y += line_h_log
+                    continue
+
+                line_surf = log_font.render(line, True, text_color)
+                screen.blit(line_surf, (panel_x + padding, current_y))
+                current_y += line_h_log
+            if current_y > panel_y + panel_height: break # Break outer loop too if needed
+    else:
+        # Simple visibility checks like above
+        if not (current_y > panel_y + panel_height or current_y + line_h_log < panel_y):
+            no_mem_surf = log_font.render("- None", True, text_color)
+            screen.blit(no_mem_surf, (panel_x + padding, current_y))
+        current_y += line_h_log # Still advance Y
+
 
     # --- Remove Clipping ---
     screen.set_clip(None)
