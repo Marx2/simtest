@@ -257,7 +257,7 @@ def main():
 
         # Draw simulation elements (Sims)
         for sim in sims_dict.values(): # Iterate over dict values
-            sim.draw(screen, dt)
+            sim.draw(screen, dt, all_sims_list)
         weather.draw_effects(screen) # Draw weather effects over sims
 
         # Draw UI Text (Pause/Speed)

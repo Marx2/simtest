@@ -304,7 +304,7 @@ class Sim:
        except Exception as e:
            print(f"Error loading sprite sheet: {e}")
            return "Unknown_Sim", None # Return a default name if loading fails
-    def draw(self, screen, dt):
+    def draw(self, screen, dt, all_sims):
         """Draws the Sim and its current thought on the screen."""
         sim_pos = (int(self.x), int(self.y))
 
@@ -334,6 +334,23 @@ class Sim:
              # Assuming current_thought display is handled by its own timer logic elsewhere
              bubble_text = self.current_thought
 
-        if bubble_text:
+        if bubble_text and self.conversation_message_timer >= 0:
+            # Check for overlapping bubbles
+            if self.is_interacting and self.conversation_partner_id:
+                partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
+                if partner and partner.conversation_message:
+                    distance = self.x - partner.x
+                    bubble_width = 150  # Static bubble width from panel.py
+                    if abs(distance) < bubble_width:
+                        # Alternate bubble position (left/right)
+                        if self.sim_id > partner.sim_id:  # Ensure consistent ordering
+                            bubble_x_offset = -bubble_width  # Move left
+                        else:
+                            bubble_x_offset = bubble_width  # Move right
+                        # Get original bubble position
+                        bubble_x = sim_pos[0]
+                        # Apply offset
+                        sim_pos = (int(bubble_x + bubble_x_offset), sim_pos[1])
+
             draw_bubble(screen, bubble_text, sim_pos) # Use the imported function
 
