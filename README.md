@@ -11,7 +11,14 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python src/main.py
+cd simtest
+conda activate aisim && conda run -n aisim python -m aisim.src.main
+```
+
+## Test
+
+```bash
+python -m unittest aisim/tests/test_conversation.py
 ```
 
 ## Contributing
