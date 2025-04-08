@@ -217,7 +217,7 @@ def _initiate_conversation(self, other_sim, city, all_sims, current_time):
     # Add to global lock
     city.active_conversation_partners.add(self.sim_id)
     city.active_conversation_partners.add(other_sim.sim_id)
-    print(f"Sim {self.sim_id} & {other_sim.sim_id}: Locked conversation. Active: {city.active_conversation_partners}")
+    # print(f"Sim {self.sim_id} & {other_sim.sim_id}: Locked conversation. Active: {city.active_conversation_partners}")
 
     # Initialize conversation details
     print(f"Sim {self.sim_id} & {other_sim.sim_id}: Initializing conversation details.")
@@ -258,7 +258,7 @@ def _send_conversation_request(self, first_speaker, second_speaker_listener, cit
     if request_sent:
         first_speaker.waiting_for_ollama_response = True
         first_speaker.conversation_last_response_time = time.time()
-        print(f"Sim {first_speaker.sim_id}: Initial conversation request sent.")
+        print(f"Sim {first_speaker.sim_id}: Initial conversation request sent. Turn: {first_speaker.conversation_turns}")
     else:
         print(f"Sim {first_speaker.sim_id}: FAILED to send initial conversation request!")
         _end_interaction(self, city, all_sims)

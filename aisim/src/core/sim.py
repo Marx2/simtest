@@ -185,6 +185,7 @@ class Sim:
 
         # If it's my turn and I'm not waiting for a response, request one
         if self.is_my_turn_to_speak and not self.waiting_for_ollama_response:
+            print(f"Sim {self.sim_id}: It's my turn to speak. conversation_turns={self.conversation_turns}, waiting_for_ollama_response={self.waiting_for_ollama_response}")
             partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
             if partner:
                 print(f"Sim {self.sim_id}: Requesting conversation response (Turn {self.conversation_turns}). History: {self.conversation_history}")

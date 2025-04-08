@@ -14,6 +14,7 @@ class TestConversation(unittest.TestCase):
     def setUp(self):
         pygame.init()
         self.ollama_client = OllamaClient() # Initialize real Ollama client
+        self.ollama_client.max_concurrent_requests = 2
 
     def tearDown(self):
         pygame.quit()
@@ -109,11 +110,11 @@ class TestConversation(unittest.TestCase):
         city = City(800, 600)
         city.active_conversation_partners = set()
 
-        # Set up interaction
-        sim1.is_interacting = True
-        sim2.is_interacting = True
-        sim1.conversation_partner_id = "sim2"
-        sim2.conversation_partner_id = "sim1"
+        # Set up interaction (Note: _initiate_conversation will set these)
+        # sim1.is_interacting = True # Redundant
+        # sim2.is_interacting = True # Redundant
+        # sim1.conversation_partner_id = "sim2" # Redundant
+        # sim2.conversation_partner_id = "sim1" # Redundant
         all_sims = [sim1, sim2]
         # Let sim1 speak first in this test scenario
         sim1.is_my_turn_to_speak = True
@@ -122,30 +123,54 @@ class TestConversation(unittest.TestCase):
         # Call initiate_conversation and send_conversation_request from interaction module
         _initiate_conversation(sim1, sim2, city, all_sims, time.time())
 
-        # Determine who speaks first based on the state set by _initiate_conversation
+        # _initiate_conversation already determines the first speaker and calls
+        # _send_conversation_request internally. No need to call it again here.
+
+        # Determine who the first speaker was for assertion purposes later
         if sim1.is_my_turn_to_speak:
-            first_speaker = sim1
-            second_speaker_listener = sim2
+             first_speaker = sim1
+             second_speaker_listener = sim2
         else:
-            first_speaker = sim2
-            second_speaker_listener = sim1
+             first_speaker = sim2
+             second_speaker_listener = sim1
 
-        # Send the request using the determined first speaker
-        # Pass the first_speaker as the 'self' argument for _send_conversation_request
-        _send_conversation_request(first_speaker,first_speaker, second_speaker_listener, city, all_sims)
+        # Simulate polling for the response
+        response_processed = False
+        start_time = time.time()
+        timeout = 10.0 # seconds
+        processed_sim_id = None # Keep track of which sim's response was processed
 
-        # Wait for Ollama response (adjust sleep time if needed)
-        time.sleep(5)
+        while time.time() - start_time < timeout:
+            result = self.ollama_client.check_for_thought_results()
+            if result:
+                sim_id, response_text = result
+                print(f"Test received result for {sim_id}: {response_text}") # Debug log
+                # Find the sim instance that corresponds to the sim_id
+                sim_instance = next((s for s in all_sims if s.sim_id == sim_id), None)
+                if sim_instance:
+                     # Call the handler function from the interaction module
+                     handle_ollama_response(sim_instance, response_text, time.time(), all_sims, city)
+                     processed_sim_id = sim_id
+                     # Check if the response was for the first speaker
+                     if sim_id == first_speaker.sim_id:
+                           response_processed = True
+                           break # Exit loop once the first speaker's response is handled
+                else:
+                     print(f"Test Warning: Received result for unknown sim_id {sim_id}")
+            time.sleep(0.1) # Short sleep to avoid busy-waiting
 
-        # Check Ollama results (need to simulate polling or check directly)
-        # This part is tricky without the main loop's polling mechanism
-        # For now, we assume the response might be processed and check the message
-        # A more robust test would mock the check_for_thought_results part
+        if not response_processed:
+             print(f"Test Warning: Timed out waiting for response from {first_speaker.sim_id}")
 
         # Assertions (Check the speaker who sent the request)
         self.assertIsNotNone(first_speaker.conversation_message, "Conversation message should not be None after response")
         self.assertGreater(len(first_speaker.conversation_message), 0, "Conversation message should not be empty after response")
         print(f"Sim {first_speaker.sim_id} conversation message: {first_speaker.conversation_message}")
+
+        # Assertions (Check the listener who should receive the response next turn)
+        self.assertIsNotNone(second_speaker_listener.conversation_history[-1]['line'], "Conversation history should not be None after response")
+        self.assertGreater(len(second_speaker_listener.conversation_history[-1]['line']), 0, "Conversation history should not be empty after response")
+        print(f"Sim {second_speaker_listener.sim_id} conversation history: {second_speaker_listener.conversation_history}")
 
 
 if __name__ == '__main__':

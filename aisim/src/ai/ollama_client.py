@@ -97,7 +97,7 @@ class OllamaClient:
             return False
 
         # print(f"Starting Ollama conversation worker thread for Sim {sim_id}") # Debug
-        print(f"Sim {sim_id}: Attempting to start conversation thread. Active requests: {self.active_requests}") # Added logging
+        # print(f"Sim {sim_id}: Attempting to start conversation thread. Active requests: {self.active_requests}. Params: sim_id={sim_id}, my_name={my_name}, other_name={other_name}, history={history}, personality_info={personality_info}") # Added logging
         self.active_requests.add(sim_id)
         thread = threading.Thread(target=self._generate_conversation_worker, args=(sim_id, my_name, other_name, history, personality_info), daemon=True)
         thread.start()
