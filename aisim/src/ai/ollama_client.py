@@ -3,7 +3,7 @@ import json
 # import os # No longer needed for CONFIG_PATH
 import threading # Added
 import queue # Added
-from typing import Optional, Tuple, List, Dict # Added for type hinting
+from typing import Optional, Tuple, List, Dict, Any # Added Any for Dict values
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 class OllamaClient:
     """Handles communication with the Ollama API, including asynchronous requests.""" # Updated docstring
@@ -36,6 +36,10 @@ class OllamaClient:
         self.personality_prompt_template = config_manager.get_entry('ollama.personality_prompt_template', 'Write a personality description.')
         if not all(k in self.personality_prompt_template for k in ['{sex}', '{personality_details}']):
             print("Warning: personality_prompt_template might be missing required placeholders ({sex}, {personality_details})")
+        # Load romance analysis prompt template
+        self.romance_analysis_prompt_template = config_manager.get_entry('ollama.romance_analysis_prompt_template', 'Analyze romance: {history}')
+        if not all(k in self.romance_analysis_prompt_template for k in ['{sim1_name}', '{sim2_name}', '{history}']):
+            print("Warning: romance_analysis_prompt_template might be missing required placeholders ({sim1_name}, {sim2_name}, {history})")
 
     # Removed _load_config method as configuration is now handled by ConfigManager
     def _generate_worker(self, sim_id, situation_description):
@@ -51,8 +55,9 @@ class OllamaClient:
             print(f"Error communicating with Ollama for Sim {sim_id}: {e}")
             result = f"({self.model} unavailable)" # Placeholder thought on error
         finally:
-            # Put result (or error message) and sim_id onto the queue
-            self.results_queue.put((sim_id, result))
+            # Put structured result onto the queue
+            result_data = {'type': 'thought', 'sim_id': sim_id, 'data': result}
+            self.results_queue.put(result_data)
             # Mark request as completed for this sim_id
             self.active_requests.discard(sim_id)
             # print(f"Ollama worker finished for Sim {sim_id}. Active requests: {self.active_requests}") # Debug
@@ -87,9 +92,11 @@ class OllamaClient:
             print(f"Sim {sim_id}\n---------\n {result}\n---------\n") # Debug
         except Exception as e:
             print(f"Error communicating with Ollama for Sim {sim_id} (conversation): {e}")
-            result = f"({self.model} unavailable)" # Placeholder thought on error
+            result = f"({self.model} unavailable)" # Placeholder conversation response on error
         finally:
-            self.results_queue.put((sim_id, result))
+            # Put structured result onto the queue
+            result_data = {'type': 'conversation', 'sim_id': sim_id, 'data': result}
+            self.results_queue.put(result_data)
             self.active_requests.discard(sim_id)
 
 
@@ -120,16 +127,108 @@ class OllamaClient:
         thread.start()
         return True
 
-    def check_for_thought_results(self) -> Optional[Tuple[any, str]]:
-        """Checks the queue for completed thought generation results. Non-blocking."""
+    def _generate_romance_analysis_worker(self, sim1_id: Any, sim1_name: str, sim2_id: Any, sim2_name: str, history: List[Dict[str, str]]):
+        """Worker function to analyze conversation history for romance change."""
+        history_str = "\n".join([f"{msg['speaker']}: {msg['line']}" for msg in history]) if history else "No conversation history."
+        prompt = self.romance_analysis_prompt_template.format(
+            sim1_name=sim1_name,
+            sim2_name=sim2_name,
+            history=history_str
+        )
+        analysis_result = "NEUTRAL" # Default
         try:
-            # Get result without blocking
-            sim_id, result = self.results_queue.get_nowait()
-            # print(f"Retrieved result for Sim {sim_id} from queue.") # Debug
-            return sim_id, result
+            print(f"Analyzing romance between {sim1_name} ({sim1_id}) and {sim2_name} ({sim2_id})...") # Debug
+            # print(f"Analysis Prompt:\n{prompt}") # Verbose Debug
+            response = self.client.generate(model=self.model, prompt=prompt, stream=False)
+            raw_result = response.get('response', '').strip().upper()
+            # Basic validation: ensure it's one of the expected values
+            if raw_result in ["INCREASE", "DECREASE", "NEUTRAL"]:
+                analysis_result = raw_result
+                print(f"Romance analysis result: {analysis_result}") # Debug
+            else:
+                print(f"Warning: Unexpected romance analysis result '{raw_result}'. Defaulting to NEUTRAL.")
+        except Exception as e:
+            print(f"Error during romance analysis between {sim1_id} and {sim2_id}: {e}")
+            analysis_result = "NEUTRAL" # Default to neutral on error
+        finally:
+            # Put structured result onto the queue
+            result_data = {
+                'type': 'romance_analysis',
+                'sim1_id': sim1_id,
+                'sim2_id': sim2_id,
+                'data': analysis_result # INCREASE, DECREASE, or NEUTRAL
+            }
+            self.results_queue.put(result_data)
+            # Note: No need to manage active_requests here as analysis runs post-interaction.
+
+    def request_romance_analysis(self, sim1_id: Any, sim1_name: str, sim2_id: Any, sim2_name: str, history: List[Dict[str, str]]) -> bool:
+        """Requests asynchronous analysis of conversation romance level."""
+        print(f"Starting romance analysis worker thread for interaction between {sim1_id} and {sim2_id}") # Debug
+        thread = threading.Thread(
+            target=self._generate_romance_analysis_worker,
+            args=(sim1_id, sim1_name, sim2_id, sim2_name, history),
+            daemon=True
+        )
+        thread.start()
+        return True # Assume thread start is successful for now
+
+    def check_for_results(self) -> Optional[Dict[str, Any]]:
+        """Checks the queue for any completed results (thought, conversation, analysis). Non-blocking."""
+        try:
+            # Get result dictionary without blocking
+            result_data = self.results_queue.get_nowait()
+            # print(f"Retrieved result from queue: {result_data}") # Debug
+            return result_data
         except queue.Empty:
             # Queue is empty, no results available
             return None
+
+    # --- The methods below were added/modified for romance analysis ---
+
+    def _generate_romance_analysis_worker(self, sim1_id: Any, sim1_name: str, sim2_id: Any, sim2_name: str, history: List[Dict[str, str]]):
+        """Worker function to analyze conversation history for romance change."""
+        history_str = "\n".join([f"{msg['speaker']}: {msg['line']}" for msg in history]) if history else "No conversation history."
+        prompt = self.romance_analysis_prompt_template.format(
+            sim1_name=sim1_name,
+            sim2_name=sim2_name,
+            history=history_str
+        )
+        analysis_result = "NEUTRAL" # Default
+        try:
+            print(f"Analyzing romance between {sim1_name} ({sim1_id}) and {sim2_name} ({sim2_id})...") # Debug
+            # print(f"Analysis Prompt:\n{prompt}") # Verbose Debug
+            response = self.client.generate(model=self.model, prompt=prompt, stream=False)
+            raw_result = response.get('response', '').strip().upper()
+            # Basic validation: ensure it's one of the expected values
+            if raw_result in ["INCREASE", "DECREASE", "NEUTRAL"]:
+                analysis_result = raw_result
+                print(f"Romance analysis result: {analysis_result}") # Debug
+            else:
+                print(f"Warning: Unexpected romance analysis result '{raw_result}'. Defaulting to NEUTRAL.")
+        except Exception as e:
+            print(f"Error during romance analysis between {sim1_id} and {sim2_id}: {e}")
+            analysis_result = "NEUTRAL" # Default to neutral on error
+        finally:
+            # Put structured result onto the queue
+            result_data = {
+                'type': 'romance_analysis',
+                'sim1_id': sim1_id,
+                'sim2_id': sim2_id,
+                'data': analysis_result # INCREASE, DECREASE, or NEUTRAL
+            }
+            self.results_queue.put(result_data)
+            # Note: No need to manage active_requests here as analysis runs post-interaction.
+
+    def request_romance_analysis(self, sim1_id: Any, sim1_name: str, sim2_id: Any, sim2_name: str, history: List[Dict[str, str]]) -> bool:
+        """Requests asynchronous analysis of conversation romance level."""
+        print(f"Starting romance analysis worker thread for interaction between {sim1_id} and {sim2_id}") # Debug
+        thread = threading.Thread(
+            target=self._generate_romance_analysis_worker,
+            args=(sim1_id, sim1_name, sim2_id, sim2_name, history),
+            daemon=True
+        )
+        thread.start()
+        return True # Assume thread start is successful for now
 
     # Keep the synchronous version for potential testing or other uses
     def generate_thought_sync(self, situation_description):

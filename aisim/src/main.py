@@ -183,22 +183,82 @@ def main():
             weather.weather_update(dt)
             city.city_update(dt) # Update city state (currently does nothing)
 
-            # --- Poll for Ollama Results (Thoughts & Conversation Responses) ---
+            # --- Poll for Ollama Results (Thoughts, Conversation Responses, Analysis) ---
             while True:
-                result = ollama_client.check_for_thought_results()
-                if result is None:
+                result_data = ollama_client.check_for_results() # Use the updated method
+                if result_data is None:
                     break # No more results in the queue for now
 
-                sim_id, response_text = result
-                target_sim = sims_dict.get(sim_id)
+                result_type = result_data.get('type')
 
-                if target_sim and response_text:
-                    # Pass the response to the interaction module's handler method
-                    interaction.handle_ollama_response(target_sim, response_text, current_sim_time, all_sims_list, city)
-                elif not target_sim:
-                     print(f"Warning: Received Ollama result for unknown Sim ID: {sim_id}")
-                # The old direct setting of current_thought/thought_timer is now handled within handle_ollama_response
+                if result_type == 'thought':
+                    sim_id = result_data.get('sim_id')
+                    response_text = result_data.get('data')
+                    target_sim = sims_dict.get(sim_id)
+                    if target_sim and response_text:
+                        # Handle thought (might eventually use interaction.handle_ollama_response or a dedicated func)
+                        target_sim.current_thought = response_text
+                        target_sim.thought_timer = THOUGHT_DURATION # Assuming THOUGHT_DURATION is defined/accessible
+                        print(f"Sim {sim_id} thought: {response_text}") # Debug
+                    elif not target_sim:
+                        print(f"Warning: Received 'thought' result for unknown Sim ID: {sim_id}")
 
+                elif result_type == 'conversation':
+                    sim_id = result_data.get('sim_id')
+                    response_text = result_data.get('data')
+                    target_sim = sims_dict.get(sim_id)
+                    if target_sim and response_text:
+                        # Pass conversation response to the interaction handler
+                        interaction.handle_ollama_response(target_sim, response_text, current_sim_time, all_sims_list, city)
+                    elif not target_sim:
+                        print(f"Warning: Received 'conversation' result for unknown Sim ID: {sim_id}")
+
+                elif result_type == 'romance_analysis':
+                    sim1_id = result_data.get('sim1_id')
+                    sim2_id = result_data.get('sim2_id')
+                    analysis_result = result_data.get('data') # INCREASE, DECREASE, NEUTRAL
+
+                    sim1 = sims_dict.get(sim1_id)
+                    sim2 = sims_dict.get(sim2_id)
+                    romance_change_step = config_manager.get_entry('simulation.romance_change_step', 0.05) # Get from config
+
+                    if sim1 and sim2 and analysis_result:
+                        change = 0.0
+                        if analysis_result == "INCREASE":
+                            change = romance_change_step
+                        elif analysis_result == "DECREASE":
+                            change = -romance_change_step
+
+                        if change != 0.0:
+                            # Update Sim 1's relationship towards Sim 2
+                            if sim2_id in sim1.relationships:
+                                current_romance_1 = sim1.relationships[sim2_id].get("romance", 0.0)
+                                new_romance_1 = max(0.0, min(1.0, current_romance_1 + change))
+                                sim1.relationships[sim2_id]["romance"] = new_romance_1
+                                print(f"Romance {sim1.first_name} -> {sim2.first_name}: {current_romance_1:.2f} -> {new_romance_1:.2f} ({analysis_result})")
+                            else: # Initialize if somehow missing
+                                sim1.relationships[sim2_id] = {"friendship": 0.0, "romance": max(0.0, min(1.0, change))}
+                                print(f"Romance {sim1.first_name} -> {sim2.first_name}: Initialized to {sim1.relationships[sim2_id]['romance']:.2f} ({analysis_result})")
+
+                            # Update Sim 2's relationship towards Sim 1
+                            if sim1_id in sim2.relationships:
+                                current_romance_2 = sim2.relationships[sim1_id].get("romance", 0.0)
+                                new_romance_2 = max(0.0, min(1.0, current_romance_2 + change))
+                                sim2.relationships[sim1_id]["romance"] = new_romance_2
+                                print(f"Romance {sim2.first_name} -> {sim1.first_name}: {current_romance_2:.2f} -> {new_romance_2:.2f} ({analysis_result})")
+                            else: # Initialize if somehow missing
+                                sim2.relationships[sim1_id] = {"friendship": 0.0, "romance": max(0.0, min(1.0, change))}
+                                print(f"Romance {sim2.first_name} -> {sim1.first_name}: Initialized to {sim2.relationships[sim1_id]['romance']:.2f} ({analysis_result})")
+                        else:
+                             print(f"Romance analysis between {sim1.first_name} and {sim2.first_name}: NEUTRAL, no change.")
+
+                    elif not sim1:
+                        print(f"Warning: Received 'romance_analysis' for unknown Sim1 ID: {sim1_id}")
+                    elif not sim2:
+                        print(f"Warning: Received 'romance_analysis' for unknown Sim2 ID: {sim2_id}")
+
+                else:
+                    print(f"Warning: Received unknown result type from Ollama queue: {result_type}")
         # --- Drawing --- (Always draw, even when paused)
         screen.fill(weather.get_current_color()) # Use weather color for background
 

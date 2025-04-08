@@ -18,7 +18,8 @@
     "conversation_max_turns": 4,
     "conversation_response_timeout": 30.0,
     "max_concurrent_requests": 1,
-    "personality_prompt_template": "Based on the following details:\\nSex: {sex}\\n{personality_details}\\n\\nWrite a brief, engaging personality description for this character in the second person (e.g., 'You are...'). Focus on the most salient traits and motivations."
+    "personality_prompt_template": "Based on the following details:\\nSex: {sex}\\n{personality_details}\\n\\nWrite a brief, engaging personality description for this character in the second person (e.g., 'You are...'). Focus on the most salient traits and motivations.",
+    "romance_analysis_prompt_template": "Analyze the following conversation history between {sim1_name} and {sim2_name}. Based *only* on the tone and content of their interaction, did the overall romantic sentiment between them increase, decrease, or stay neutral? Respond with ONLY ONE word: INCREASE, DECREASE, or NEUTRAL. Do not add explanations or any other text.\n\nConversation History:\n{history}"
   },
   "simulation": {
     "initial_sims": 10,
@@ -28,7 +29,8 @@
     "ignore_interaction_time": 15.0,
     "bubble_display_time_seconds": 15.0,
     "interaction_distance": 40,
-    "thought_duration": 5.0
+    "thought_duration": 5.0,
+    "romance_change_step": 0.05
   },
   "movement": {
     "direction_change_frequency": 5.0

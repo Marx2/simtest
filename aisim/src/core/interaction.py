@@ -115,7 +115,19 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
     """Cleans up state at the end of an interaction."""
     # print(f"Sim {self.sim_id}: Ending interaction with {self.conversation_partner_id}")
     partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-    if partner and partner.is_interacting:
+
+    # --- Capture data for romance analysis *before* clearing state ---
+    final_history = self.conversation_history[:] if self.conversation_history else None
+    sim1_id = self.sim_id
+    sim1_name = self.first_name
+    sim2_id = None
+    sim2_name = None
+    if partner: # Check if partner exists before accessing attributes
+        sim2_id = partner.sim_id
+        sim2_name = partner.first_name
+    # --- End Capture ---
+
+    if partner and partner.is_interacting: # Now clear partner state if valid
             partner.is_interacting = False
             partner.talking_with = None
             partner.conversation_history = None
@@ -142,6 +154,19 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
     if self.sim_id in city.active_conversation_partners:
         city.active_conversation_partners.remove(self.sim_id)
         # print(f"Sim {self.sim_id} removed from active conversations.")
+
+    # --- Trigger Romance Analysis ---
+    if final_history and sim2_id is not None: # Only analyze if there was history and a valid partner
+        try:
+            self.ollama_client.request_romance_analysis(
+                sim1_id, sim1_name, sim2_id, sim2_name, final_history
+            )
+        except AttributeError:
+            print(f"ERROR: Sim {sim1_id} could not access ollama_client to request romance analysis.")
+    elif not final_history:
+        print(f"Skipping romance analysis between {sim1_name} and {sim2_name}: No conversation history.")
+    # else: # No need for explicit else, handled by sim2_id check
+    #     print(f"Skipping romance analysis for {sim1_name}: Partner was invalid.")
 
 def handle_ollama_response(self, response_text: str, current_time: float, all_sims: List['Sim'], city):
     """Handles a response received from Ollama."""
