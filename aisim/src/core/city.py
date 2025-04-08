@@ -27,7 +27,7 @@ class City:
         self._create_tile_map() # Create a map of which tile to draw where
         self.sims = [] # Initialize sims list
         self.active_conversation_partners = set() # Track sims currently talking
-
+        self.pending_romance_analysis = set() # Track (sim_id1, sim_id2) pairs awaiting analysis
     def _load_tilesets(self):
         """Loads the required tileset images."""
         self.tilesets = {}

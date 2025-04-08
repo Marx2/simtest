@@ -161,6 +161,10 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
             self.ollama_client.request_romance_analysis(
                 sim1_id, sim1_name, sim2_id, sim2_name, final_history
             )
+            # Add pair to pending analysis lock
+            analysis_pair = tuple(sorted((sim1_id, sim2_id))) # Ensure consistent ordering
+            city.pending_romance_analysis.add(analysis_pair)
+            print(f"Added {analysis_pair} to pending romance analysis.") # Debug
         except AttributeError:
             print(f"ERROR: Sim {sim1_id} could not access ollama_client to request romance analysis.")
     elif not final_history:
@@ -218,9 +222,15 @@ def handle_ollama_response(self, response_text: str, current_time: float, all_si
 
 def _initiate_conversation(self, other_sim, city, all_sims, current_time):
     """Handles the conversation initiation logic between two Sims."""
-    # Global Conversation Lock Check
+    # Global Conversation Lock Check (existing)
     if self.sim_id in city.active_conversation_partners or other_sim.sim_id in city.active_conversation_partners:
         return
+
+    # Pending Romance Analysis Lock Check (New)
+    analysis_pair = tuple(sorted((self.sim_id, other_sim.sim_id))) # Ensure consistent ordering
+    if analysis_pair in city.pending_romance_analysis:
+        # print(f"Conversation between {self.sim_id} and {other_sim.sim_id} blocked: Pending romance analysis.") # Debug
+        return # Don't start conversation if analysis is pending for this pair
 
     # Lock Conversation Globally & Start Interaction State
     print(f"Sim {self.sim_id}: Starting interaction with Sim {other_sim.sim_id}")

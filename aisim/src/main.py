@@ -257,6 +257,12 @@ def main():
                     elif not sim2:
                         print(f"Warning: Received 'romance_analysis' for unknown Sim2 ID: {sim2_id}")
 
+                    # --- Remove pair from pending analysis lock ---
+                    if sim1_id and sim2_id:
+                        analysis_pair = tuple(sorted((sim1_id, sim2_id)))
+                        city.pending_romance_analysis.discard(analysis_pair)
+                        # print(f"Removed {analysis_pair} from pending romance analysis.") # Debug
+
                 else:
                     print(f"Warning: Received unknown result type from Ollama queue: {result_type}")
         # --- Drawing --- (Always draw, even when paused)
