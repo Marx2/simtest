@@ -11,8 +11,9 @@ from aisim.src.core.weather import Weather
 from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
 from aisim.src.core.logger import Logger
 from aisim.src.ai.ollama_client import OllamaClient
-from aisim.src.bubble import bubble
+from aisim.src.core.bubble import bubble
 from aisim.src.core.mood import get_mood_description
+from aisim.src.core import interaction
 
 print(f"Current working directory: {os.getcwd()}")
 print(f"Python sys.path: {sys.path}")
@@ -40,25 +41,13 @@ def main():
     # Create Simulation Components
     weather = Weather(weather_config, SCREEN_WIDTH, SCREEN_HEIGHT) # Pass weather config section
     city = City(SCREEN_WIDTH, SCREEN_HEIGHT) # City will use config_manager internally now
-    # enable_talking is retrieved above
 
     # Store sims in a dictionary for easy lookup by ID
     sims_dict = {}
-    for _ in range(initial_sims): # Use retrieved initial_sims
-        new_sim = Sim(
-            sim_id=str(uuid.uuid4()),  # Generate unique ID
-            x=max(0, min(random.randint(0, SCREEN_WIDTH), SCREEN_WIDTH - TILE_SIZE -1)),
-            y=max(0, min(random.randint(0, SCREEN_HEIGHT), SCREEN_HEIGHT - TILE_SIZE -1)),
-            ollama_client=ollama_client, # Pass the client instance
-            enable_talking=enable_talking, # Use retrieved enable_talking
-            sim_config=sim_creation_config, # Pass the retrieved sim config dictionary
-            bubble_display_time=bubble_display_time # Pass retrieved bubble_display_time
-        )
-        sims_dict[new_sim.sim_id] = new_sim
+    sims_dict = initialize_sims(initial_sims, sims_dict, ollama_client, enable_talking, sim_creation_config, bubble_display_time, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE)
 
     # Add sims to city
     city.sims = list(sims_dict.values()) # City might still expect a list
-    # Allow sims to talk after display is initialized
     logger = Logger() # Create logger instance
 
     running = True
@@ -166,8 +155,6 @@ def main():
             for sim in all_sims_list:
                 # Pass city.TILE_SIZE to sim.update for arrival checks
                 sim.sim_update(dt, city, weather.current_state, all_sims_list, logger, current_sim_time, TILE_SIZE, movement_direction_change_frequency) # Use retrieved frequency
-                # Interaction check is now called within sim.update, remove explicit call here
-            #   sim._check_interactions(sims, logger, current_sim_time) # Removed redundant call
             weather.weather_update(dt)
             city.city_update(dt) # Update city state (currently does nothing)
 
@@ -182,7 +169,6 @@ def main():
 
                 if target_sim and response_text:
                     # Pass the response to the interaction module's handler method
-                    from aisim.src.core import interaction
                     interaction.handle_ollama_response(target_sim, response_text, current_sim_time, all_sims_list, city)
                 elif not target_sim:
                      print(f"Warning: Received Ollama result for unknown Sim ID: {sim_id}")
@@ -446,6 +432,20 @@ def main():
     logger.close() # Close log files cleanly
     pygame.quit()
     sys.exit()
+
+def initialize_sims(initial_sims, sims_dict, ollama_client, enable_talking, sim_creation_config, bubble_display_time, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE):
+    for _ in range(initial_sims): # Use retrieved initial_sims
+        new_sim = Sim(
+            sim_id=str(uuid.uuid4()),  # Generate unique ID
+            x=max(0, min(random.randint(0, SCREEN_WIDTH), SCREEN_WIDTH - TILE_SIZE - 1)),
+            y=max(0, min(random.randint(0, SCREEN_HEIGHT), SCREEN_HEIGHT - TILE_SIZE - 1)),
+            ollama_client=ollama_client, # Pass the client instance
+            enable_talking=enable_talking, # Use retrieved enable_talking
+            sim_config=sim_creation_config, # Pass the retrieved sim config dictionary
+            bubble_display_time=bubble_display_time # Pass retrieved bubble_display_time
+        )
+        sims_dict[new_sim.sim_id] = new_sim
+    return sims_dict
 
 if __name__ == "__main__":
     main()
