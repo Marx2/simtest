@@ -9,75 +9,18 @@ from aisim.src.core.configuration import config_manager # Import the centralized
 from aisim.src.core.sim import Sim # Import Sim class (constants are now internal or loaded from config)
 from aisim.src.core.weather import Weather
 from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
-from aisim.src.core.interaction import THOUGHT_DURATION # Added import
 from aisim.src.core.logger import Logger
 from aisim.src.ai.ollama_client import OllamaClient
+from aisim.src.bubble import bubble
+from aisim.src.core.mood import get_mood_description
+
 print(f"Current working directory: {os.getcwd()}")
 print(f"Python sys.path: {sys.path}")
-# Constants (Defaults, will be overridden by config)
 SCREEN_WIDTH = config_manager.get_entry('simulation.screen_width', 800) # Default width
 SCREEN_HEIGHT = config_manager.get_entry('simulation.screen_height', 600) # Default height
 WINDOW_TITLE = config_manager.get_entry('simulation.window_title', "AI Simulation") # Default title
 FPS = config_manager.get_entry('simulation.fps', 60) # Default FPS
 
-# --- Helper Functions ---
-def wrap_text(text, font, max_width):
-    """Wraps text to fit within a specified width."""
-    lines = []
-    # Handle potential None or empty text
-    if not text:
-        return [""]
-    # Split into paragraphs first to preserve line breaks
-    paragraphs = text.split('\n')
-    for paragraph in paragraphs:
-        words = paragraph.split(' ')
-        current_line = []
-        while words:
-            word = words.pop(0)
-            test_line = ' '.join(current_line + [word])
-            # Check if the line fits
-            if font.size(test_line)[0] <= max_width:
-                current_line.append(word)
-            # If the line doesn't fit AND it's not the only word
-            elif current_line:
-                lines.append(' '.join(current_line))
-                current_line = [word] # Start new line with the word that didn't fit
-            # If the line doesn't fit and it IS the only word (word is too long)
-            else:
-                # Simple character-based wrap for overly long words
-                temp_word = ""
-                for char in word:
-                    if font.size(temp_word + char)[0] <= max_width:
-                        temp_word += char
-                    else:
-                        lines.append(temp_word)
-                        temp_word = char
-                if temp_word: # Add the remainder of the long word
-                    lines.append(temp_word)
-                current_line = [] # Reset current line after handling long word
-        # Add the last line of the paragraph if it has content
-        if current_line:
-            lines.append(' '.join(current_line))
-        # Add an empty line between paragraphs if the original text had one
-        if paragraph != paragraphs[-1]: # Don't add extra space after the last paragraph
-             lines.append("") # Add empty string to represent paragraph break
-    # Ensure at least one line is returned if text was just whitespace
-    if not lines and text.strip() == "":
-        return [""]
-    elif not lines: # If text was non-empty but resulted in no lines somehow
-        return [text] # Return original text as a single line
-    return lines
-
-
-def get_mood_description(mood_value):
-    """Converts mood float (-1 to 1) to a descriptive string."""
-    if mood_value < -0.7: return "Very Sad"
-    if mood_value < -0.3: return "Sad"
-    if mood_value < 0.3: return "Neutral"
-    if mood_value < 0.7: return "Happy"
-    return "Very Happy"
-
-# --- End Helper Functions ---
 def main():
     # Get config values using the centralized manager
     fps = config_manager.get_entry('simulation.fps', 60)
@@ -336,7 +279,7 @@ def main():
 
             # Height for Personality
             estimated_content_height += line_h_log # Title
-            pers_lines = wrap_text(detailed_sim.personality_description, log_font, panel_width - 2 * padding - scrollbar_width)
+            pers_lines = bubble.wrap_text(detailed_sim.personality_description, log_font, panel_width - 2 * padding - scrollbar_width)
             estimated_content_height += len(pers_lines) * line_h_log + line_spacing
 
             # Height for Relationships
@@ -433,7 +376,7 @@ def main():
             current_y += line_h_log
 
             # Use the pre-wrapped lines from height calculation
-            # pers_lines = wrap_text(detailed_sim.personality_description, log_font, content_width) # Already done
+            # pers_lines = bubble.wrap_text(detailed_sim.personality_description, log_font, content_width) # Already done
             for line in pers_lines:
                 # Simple check: Don't draw if the line *starts* way below the panel
                 if current_y > panel_y + panel_height:
