@@ -192,13 +192,19 @@ class Sim:
             partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
             if partner:
                 print(f"Sim {self.sim_id}: Requesting conversation response (Turn {self.conversation_turns}). History: {self.conversation_history}")
+                # Get the romance level towards the partner
+                relationship_data = self.relationships.get(self.conversation_partner_id, {}) # Default to empty dict if no relationship entry
+                romance_level = relationship_data.get("romance", 0.0) # Default to 0.0 if 'romance' key missing
+                print(f"Sim {self.sim_id}: Romance level towards {partner.first_name} ({self.conversation_partner_id}) = {romance_level:.2f}") # Debug log
+
                 # Note: Using self.ollama_client requires ollama_client to be passed or accessible
                 request_sent = self.ollama_client.request_conversation_response(
                     self.sim_id,
                     self.first_name,
                     partner.first_name,
                     self.conversation_history,
-                    self.personality_description # Pass pre-calculated description string
+                    self.personality_description, # Pass pre-calculated description string
+                    romance_level # Pass the calculated romance level
                 )
                 if request_sent:
                     self.waiting_for_ollama_response = True

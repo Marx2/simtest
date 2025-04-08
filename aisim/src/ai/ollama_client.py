@@ -14,7 +14,8 @@ class OllamaClient:
         host = config_manager.get_entry('ollama.host', 'http://localhost:11434')
         self.model = config_manager.get_entry('ollama.model', 'phi3') # Provide a reasonable default model
         self.prompt_template = config_manager.get_entry('ollama.default_prompt_template', 'Default prompt: {situation}')
-        self.conversation_prompt_template = config_manager.get_entry('ollama.conversation_prompt_template', self.prompt_template) # Fallback to default prompt template
+        # Load the list of conversation prompt templates
+        self.conversation_prompt_levels = config_manager.get_entry('ollama.conversation_prompt_levels', [])
         self.conversation_response_timeout = config_manager.get_entry('ollama.conversation_response_timeout', 30.0) # Default 30s
         self.max_concurrent_requests = config_manager.get_entry('ollama.max_concurrent_requests', 1) # Read max concurrent requests
 
@@ -22,9 +23,15 @@ class OllamaClient:
         self.results_queue = queue.Queue() # Queue to store results from threads
         self.active_requests = set() # Keep track of active requests per Sim ID
         print(f"Ollama client initialized. Host: {host}, Model: {self.model}")
-        # Verify the conversation template has the required placeholders
-        if not all(k in self.conversation_prompt_template for k in ['{my_name}', '{other_name}', '{history}', '{personality_info}']):
-             print("Warning: conversation_prompt_template might be missing required placeholders ({my_name}, {other_name}, {history}, {personality_info})")
+        # Verify the conversation prompt levels list
+        if not isinstance(self.conversation_prompt_levels, list) or len(self.conversation_prompt_levels) != 10:
+            print(f"Error: 'ollama.conversation_prompt_levels' must be a list of 10 strings in config. Found: {self.conversation_prompt_levels}")
+            self.conversation_prompt_levels = [self.prompt_template] * 10 # Fallback to default template for all levels
+        else:
+             # Optionally, verify placeholders in each template (can be verbose)
+             for i, template in enumerate(self.conversation_prompt_levels):
+                 if not all(k in template for k in ['{my_name}', '{other_name}', '{history}', '{personality_info}']):
+                     print(f"Warning: conversation_prompt_levels[{i}] might be missing required placeholders.")
         # Load personality prompt template and verify placeholders
         self.personality_prompt_template = config_manager.get_entry('ollama.personality_prompt_template', 'Write a personality description.')
         if not all(k in self.personality_prompt_template for k in ['{sex}', '{personality_details}']):
@@ -51,12 +58,17 @@ class OllamaClient:
             # print(f"Ollama worker finished for Sim {sim_id}. Active requests: {self.active_requests}") # Debug
 
 
-    def _generate_conversation_worker(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]], personality_info: str):
+    def _generate_conversation_worker(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]], personality_info: str, romance_level: float):
         """Worker function to run Ollama conversation generation in a separate thread."""
         # Format history for the prompt
         history_str = "\n".join([f"{msg['speaker']}: {msg['line']}" for msg in history]) if history else "This is the start of the conversation."
 
-        prompt = self.conversation_prompt_template.format(
+        # Select prompt based on romance level (0.0 to 1.0)
+        clamped_level = max(0.0, min(1.0, romance_level))
+        prompt_index = min(len(self.conversation_prompt_levels) - 1, int(clamped_level * len(self.conversation_prompt_levels))) # Ensure index is valid
+        selected_template = self.conversation_prompt_levels[prompt_index]
+
+        prompt = selected_template.format(
             my_name=my_name,
             other_name=other_name,
             history=history_str,
@@ -90,8 +102,8 @@ class OllamaClient:
         thread.start()
         return True
 
-    def request_conversation_response(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]], personality_info: str) -> bool:
-        """Requests a conversation response asynchronously, including personality description. Returns True if request started, False otherwise."""
+    def request_conversation_response(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]], personality_info: str, romance_level: float) -> bool:
+        """Requests a conversation response asynchronously, selecting prompt based on romance_level. Returns True if request started, False otherwise."""
         # Check global concurrent request limit first
         if len(self.active_requests) >= self.max_concurrent_requests:
             # print(f"Sim {sim_id}: Cannot start conversation thread. Max concurrent requests ({self.max_concurrent_requests}) reached. Active: {self.active_requests}") # Debug
@@ -104,7 +116,7 @@ class OllamaClient:
         # print(f"Starting Ollama conversation worker thread for Sim {sim_id}") # Debug
         # print(f"Sim {sim_id}: Attempting to start conversation thread. Active requests: {self.active_requests}. Params: sim_id={sim_id}, my_name={my_name}, other_name={other_name}, history={history}, personality_info={personality_info}") # Added logging
         self.active_requests.add(sim_id)
-        thread = threading.Thread(target=self._generate_conversation_worker, args=(sim_id, my_name, other_name, history, personality_info), daemon=True)
+        thread = threading.Thread(target=self._generate_conversation_worker, args=(sim_id, my_name, other_name, history, personality_info, romance_level), daemon=True)
         thread.start()
         return True
 

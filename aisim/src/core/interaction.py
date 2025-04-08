@@ -248,12 +248,18 @@ def _initiate_conversation(self, other_sim, city, all_sims, current_time):
 
 def _send_conversation_request(self, first_speaker, second_speaker_listener, city, all_sims):
     """Sends conversation request to Ollama client."""
+    # Get the romance level of the first speaker towards the listener
+    relationship_data = first_speaker.relationships.get(second_speaker_listener.sim_id, {})
+    romance_level = relationship_data.get("romance", 0.0) # Default to 0.0
+    print(f"Sim {first_speaker.sim_id}: Romance towards {second_speaker_listener.first_name} for initial request = {romance_level:.2f}") # Debug
+
     request_sent = first_speaker.ollama_client.request_conversation_response(
         first_speaker.sim_id,
         first_speaker.first_name,
         second_speaker_listener.first_name,
         first_speaker.conversation_history,
         first_speaker.personality_description,
+        romance_level # Pass the romance level
     )
     if request_sent:
         first_speaker.waiting_for_ollama_response = True
