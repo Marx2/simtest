@@ -256,12 +256,12 @@ def change_direction(sim, city, direction_change_frequency):
             sim.path_index = 0
             sim.target = sim.path[sim.path_index]
             # print(f"Sim {sim.sim_id}: Changed direction to {new_direction}")
-        else:
-            print(f"Sim {sim.sim_id}: No path found after changing direction.")
+        # else:
+            # print(f"Sim {sim.sim_id}: No path found after changing direction.")
 
     else:
         new_direction = None
-        print(f"Sim {sim.sim_id}: No path found in new direction {new_direction}")
+        # print(f"Sim {sim.sim_id}: No path found in new direction {new_direction}")
 
 def get_available_directions(sim, city):
     """Gets available directions for the Sim to move in."""
@@ -272,7 +272,7 @@ def get_available_directions(sim, city):
     if current_node:
         # print(f"Sim {sim.sim_id}: current_node = {current_node}")
         if current_node not in city.graph.nodes:
-            print(f"Sim {sim.sim_id}: current_node {current_node} not in city.graph.nodes")
+            # print(f"Sim {sim.sim_id}: current_node {current_node} not in city.graph.nodes")
             return []
         neighbors = list(city.graph.neighbors(current_node))
         for neighbor in neighbors:

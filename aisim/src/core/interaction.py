@@ -113,7 +113,7 @@ def check_interactions(self, all_sims, logger, current_time, city): # Add city p
 
 def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
     """Cleans up state at the end of an interaction."""
-    print(f"Sim {self.sim_id}: Ending interaction with {self.conversation_partner_id}")
+    # print(f"Sim {self.sim_id}: Ending interaction with {self.conversation_partner_id}")
     partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
     if partner and partner.is_interacting:
             partner.is_interacting = False
@@ -127,7 +127,7 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
             # Remove partner from active conversations
             if partner.sim_id in city.active_conversation_partners:
                 city.active_conversation_partners.remove(partner.sim_id)
-                print(f"Sim {partner.sim_id} removed from active conversations.")
+                # print(f"Sim {partner.sim_id} removed from active conversations.")
 
     self.is_interacting = False
     self.talking_with = None # Keep talking_with for compatibility? Maybe remove.
@@ -141,7 +141,7 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
     # Remove self from active conversations
     if self.sim_id in city.active_conversation_partners:
         city.active_conversation_partners.remove(self.sim_id)
-        print(f"Sim {self.sim_id} removed from active conversations.")
+        # print(f"Sim {self.sim_id} removed from active conversations.")
 
 def handle_ollama_response(self, response_text: str, current_time: float, all_sims: List['Sim'], city):
     """Handles a response received from Ollama."""
@@ -253,14 +253,14 @@ def _send_conversation_request(self, first_speaker, second_speaker_listener, cit
         first_speaker.first_name,
         second_speaker_listener.first_name,
         first_speaker.conversation_history,
-        first_speaker.personality
+        first_speaker.personality_description,
     )
     if request_sent:
         first_speaker.waiting_for_ollama_response = True
         first_speaker.conversation_last_response_time = time.time()
         print(f"Sim {first_speaker.sim_id}: Initial conversation request sent. Turn: {first_speaker.conversation_turns}")
     else:
-        print(f"Sim {first_speaker.sim_id}: FAILED to send initial conversation request!")
+        # print(f"Sim {first_speaker.sim_id}: FAILED to send initial conversation request!")
         _end_interaction(self, city, all_sims)
         _end_interaction(second_speaker_listener, city, all_sims)
 
