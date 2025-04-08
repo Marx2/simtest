@@ -3,7 +3,7 @@
     "host": "http://localhost:11434",
     "model": "phi4",
     "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble.",
-    "conversation_prompt_template": "You are {my_name}, a character in a life simulation\nYou are talking to {other_name}. Continue the conversation based on personality (considering your romantic/sexual profile) and the history. Keep your response concise (1 sentence).\n\nConversation History:\n{history}\nPersonality: {personality_info}:",
+    "conversation_prompt_template": "You are {my_name}, a character in a life simulation.\nYou are talking to {other_name}. Respond fully in character, using one single concise sentence only. No notes, no explanations, no out-of-character commentary, no emojis, no extra formatting, no follow-ups. Only the in-character sentence reply. Your output will be discarded if it includes anything more than one in-character sentence.\n\nConversation History:\n{history}\nPersonality: {personality_info}:",
     "conversation_max_turns": 4,
     "conversation_response_timeout": 30.0,
     "max_concurrent_requests": 1,
