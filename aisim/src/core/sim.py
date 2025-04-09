@@ -146,7 +146,7 @@ class Sim:
                 if partner:
                     # Call the imported _send_conversation_request function
                     # Pass self as speaker, partner as listener
-                    request_successful = _send_conversation_request(self, partner, city, all_sims, current_time)
+                    request_successful = _send_conversation_request(self, partner, current_time)
 
                     if not request_successful:
                         # Request failed (Ollama client error, etc.)

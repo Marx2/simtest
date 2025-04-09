@@ -13,7 +13,7 @@ ENABLE_TALKING = config_manager.get_entry('simulation.enable_talking', False)
 BUBBLE_DISPLAY_TIME = config_manager.get_entry('simulation.bubble_display_time_seconds', 5.0)
 
 def check_interactions(self, all_sims, current_time, city): # Add city parameter
-    """Checks for and handles interactions with nearby Sims, logging them."""
+    """Checks for and handles interactions with nearby Sims"""
     INTERACTION_COOLDOWN = 1.0  # Minimum time between interactions (seconds)
     ignore_interaction_time = config_manager.get_entry('simulation.ignore_interaction_time', 5.0)
     for other_sim in all_sims:
@@ -158,7 +158,7 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
     # else: # No need for explicit else, handled by sim2_id check
     #     print(f"Skipping romance analysis for {sim1_name}: Partner was invalid.")
 
-def handle_ollama_response(self, response_text: str, current_time: float, all_sims: List['Sim'], city):
+def handle_ollama_response(self, response_text: str, all_sims: List['Sim'], city):
     """Handles a response received from Ollama, releasing the lock and managing conversation state."""
     print(f"Sim {self.sim_id}: Received Ollama response: '{response_text}'")
 
@@ -286,7 +286,7 @@ def initiate_conversation(initiator_sim, other_sim, city, all_sims, current_time
         # --- Send the first conversation request ---
         # Note: We assume _send_conversation_request will be updated per Step 3 to accept
         # (speaker, partner, city, all_sims, current_time) and return bool
-        request_successful = _send_conversation_request(first_speaker, second_speaker_listener, city, all_sims, current_time)
+        request_successful = _send_conversation_request(first_speaker, second_speaker_listener, current_time)
 
         if not request_successful:
             # Request failed, release lock and end interaction immediately
@@ -311,7 +311,7 @@ def initiate_conversation(initiator_sim, other_sim, city, all_sims, current_time
 # Note: The 'self' parameter is removed as this function operates on specific speaker/listener pairs
 # and doesn't need the instance context in the same way _initiate_conversation might have.
 # The necessary 'self' context (like ollama_client, relationships) comes from the 'speaker' object.
-def _send_conversation_request(speaker, listener, city, all_sims, current_time: float) -> bool:
+def _send_conversation_request(speaker, listener, current_time: float) -> bool:
     """
     Sends conversation request to Ollama client for the 'speaker'.
     Assumes the Ollama lock is already held by the calling function.

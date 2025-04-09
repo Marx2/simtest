@@ -212,7 +212,7 @@ def main():
                     target_sim = sims_dict.get(sim_id)
                     if target_sim and response_text:
                         # Pass conversation response to the interaction handler
-                        interaction.handle_ollama_response(target_sim, response_text, current_sim_time, all_sims_list, city)
+                        interaction.handle_ollama_response(target_sim, response_text, all_sims_list, city)
                     elif not target_sim:
                         print(f"Warning: Received 'conversation' result for unknown Sim ID: {sim_id}")
 
