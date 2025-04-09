@@ -1,8 +1,66 @@
+import os
 import random
-from typing import Dict, List, Optional
+import json
+from typing import Dict
+from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
-# Note: SIM_CONFIG and ATTRIBUTES_DATA are no longer loaded globally here.
-# They should be passed as arguments where needed.
+PERSONALITIES_DIR = config_manager.get_entry('sim.personalities_path') # Directory to store personality files
+
+# --- Load Attributes Data ---
+ATTRIBUTES_DATA = {} # Default empty
+ATTRIBUTES_FILE_PATH = config_manager.get_entry('sim.attributes_file_path')
+if ATTRIBUTES_FILE_PATH:
+    try:
+        with open(ATTRIBUTES_FILE_PATH, 'r') as f:
+            ATTRIBUTES_DATA = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: Attributes file not found at {ATTRIBUTES_FILE_PATH}")
+    except json.JSONDecodeError:
+        print(f"Error: Could not decode JSON from {ATTRIBUTES_FILE_PATH}")
+else:
+    print("Warning: 'sim.attributes_file_path' not configured")
+
+def load_or_generate_personality_for_sim(self, sim_config: Dict):
+    """Loads personality from file if exists, otherwise generates and saves it."""
+    os.makedirs(PERSONALITIES_DIR, exist_ok=True) # Ensure directory exists
+    personality_file = os.path.join(PERSONALITIES_DIR, f"{self.character_name}.json")
+
+    if os.path.exists(personality_file):
+        try:
+            with open(personality_file, 'r') as f:
+                data = json.load(f)
+            self.personality = data.get("personality", {}) # Load structured data
+            self.personality_description = data.get("personality_description", "Error: Description missing in file.") # Load description
+            print(f"Loaded personality for {self.full_name} from {personality_file}")
+        except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+            print(f"Error loading personality for {self.full_name} from {personality_file}: {e}. Regenerating.")
+            # Fallback to generation if loading fails
+            self.personality = _generate_personality(ATTRIBUTES_DATA, sim_config.get("personality", {}))
+            self.personality_description = self.ollama_client.calculate_personality_description(self.personality, self.sex)
+            save_personality(self, personality_file) # Attempt to save the newly generated data
+    else:
+        print(f"Personality file not found for {self.full_name}. Generating...")
+        # Generate personality (structured)
+        self.personality = _generate_personality(ATTRIBUTES_DATA, sim_config.get("personality", {}))
+        # Generate description (via Ollama)
+        self.personality_description = self.ollama_client.calculate_personality_description(self.personality, self.sex)
+        # Save to file
+        save_personality(self, personality_file)
+
+def save_personality(self, file_path):
+    """Saves the current personality and description to a JSON file."""
+    data_to_save = {
+        "personality": self.personality,
+        "personality_description": self.personality_description
+    }
+    try:
+        # Ensure directory exists just before writing (redundant if called after _load_or_generate_personality, but safe)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, 'w') as f:
+            json.dump(data_to_save, f, indent=4)
+        print(f"Saved personality for {self.full_name} to {file_path}")
+    except IOError as e:
+        print(f"Error saving personality for {self.full_name} to {file_path}: {e}")
 
 def _assign_sex(first_name: str, sim_config: Dict) -> str:
     """Assigns sex based on a simple heuristic using common female names from config."""

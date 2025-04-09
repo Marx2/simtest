@@ -1,32 +1,15 @@
 import pygame
 import random
-import math
 import os
-import json
 from typing import List, Dict, Optional
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import check_interactions, _end_interaction
-from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, change_direction, movement_update
+from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, movement_update
 from aisim.src.core.text import draw_bubble
-from aisim.src.core.personality import _assign_sex, _generate_personality, _format_personality_for_prompt
+from aisim.src.core.personality import _assign_sex, load_or_generate_personality_for_sim
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
 TILE_SIZE = config_manager.get_entry('city.tile_size', 32) # Add default value
-PERSONALITIES_DIR = config_manager.get_entry('sim.personalities_path') # Directory to store personality files
-
-# --- Load Attributes Data ---
-ATTRIBUTES_DATA = {} # Default empty
-ATTRIBUTES_FILE_PATH = config_manager.get_entry('sim.attributes_file_path')
-if ATTRIBUTES_FILE_PATH:
-    try:
-        with open(ATTRIBUTES_FILE_PATH, 'r') as f:
-            ATTRIBUTES_DATA = json.load(f)
-    except FileNotFoundError:
-        print(f"Error: Attributes file not found at {ATTRIBUTES_FILE_PATH}")
-    except json.JSONDecodeError:
-        print(f"Error: Could not decode JSON from {ATTRIBUTES_FILE_PATH}")
-else:
-    print("Warning: 'sim.attributes_file_path' not configured")
 
 def get_character_names():
     """Extracts character names from sprite filenames in the specified directory."""
@@ -45,9 +28,6 @@ CHARACTER_NAMES = get_character_names()
 
 # Initialize font - needs pygame.init() - Ensure font module is initialized
 pygame.font.init()
-
-# Personality generation moved to aisim.src.core.personality
-
 
 class Sim:
     """Represents a single Sim in the simulation."""
@@ -76,18 +56,14 @@ class Sim:
         self.interaction_distance = sim_config.get("interaction_distance", 20)
         self.sim_radius = sim_config.get("sim_radius", 5)
         self.color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255)) # Keep random visual color distinct from fallback
-        # self.sprite = self._load_sprite() # Load character sprite
         self.path = None
         self.path_index = 0
         self.target = None
-        # --- Personality (Load or Generate) ---
         self.ollama_client = ollama_client # Assign ollama_client earlier for use in personality gen
         self.personality = {}
         self.personality_description = "Personality not set."
-        self._load_or_generate_personality(sim_config)
-        # --- End Personality ---
+        load_or_generate_personality_for_sim(self, sim_config)
         self.memory = []  # List to store significant events or interactions
-        # self.ollama_client = ollama_client # Moved up
         self.current_thought = None
         self.thought_timer = 0.0
         self.relationships = {}  # Key: other_sim_id, Value: {"friendship": float, "romance": float}
@@ -109,7 +85,7 @@ class Sim:
         self.bubble_display_time: float = bubble_display_time # Store configured bubble time
         self.conversation_message: Optional[str] = None # Separate attribute for conversation text
         self.conversation_message_timer: float = 0.0 # Timer for conversation bubble
-    # REMOVED DUPLICATE _load_sprite method
+    
     def sim_update(self, dt, city, weather_state, all_sims: List['Sim'], logger, current_time, tile_size, direction_change_frequency): # Add tile_size and type hint
         """Updates the Sim's state, following a path if available, and logs data."""
         self.tile_size = tile_size
@@ -138,8 +114,6 @@ class Sim:
             if not self.path:
                 target_x = random.randint(0, city.grid_width - 1) * TILE_SIZE
                 target_y = random.randint(0, city.grid_height - 1) * TILE_SIZE
-
-
                 self.path = get_path((self.x, self.y), (target_x, target_y), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
             if not self.path:  # Still no path (e.g., couldn't find one)
                 return
@@ -377,44 +351,3 @@ class Sim:
             draw_bubble(screen, bubble_text, bubble_pos, sim1=sim1_arg, sim2=sim2_arg)
 
 
-    def _load_or_generate_personality(self, sim_config: Dict):
-        """Loads personality from file if exists, otherwise generates and saves it."""
-        os.makedirs(PERSONALITIES_DIR, exist_ok=True) # Ensure directory exists
-        personality_file = os.path.join(PERSONALITIES_DIR, f"{self.character_name}.json")
-
-        if os.path.exists(personality_file):
-            try:
-                with open(personality_file, 'r') as f:
-                    data = json.load(f)
-                self.personality = data.get("personality", {}) # Load structured data
-                self.personality_description = data.get("personality_description", "Error: Description missing in file.") # Load description
-                print(f"Loaded personality for {self.full_name} from {personality_file}")
-            except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
-                print(f"Error loading personality for {self.full_name} from {personality_file}: {e}. Regenerating.")
-                # Fallback to generation if loading fails
-                self.personality = _generate_personality(ATTRIBUTES_DATA, sim_config.get("personality", {}))
-                self.personality_description = self.ollama_client.calculate_personality_description(self.personality, self.sex)
-                self._save_personality(personality_file) # Attempt to save the newly generated data
-        else:
-            print(f"Personality file not found for {self.full_name}. Generating...")
-            # Generate personality (structured)
-            self.personality = _generate_personality(ATTRIBUTES_DATA, sim_config.get("personality", {}))
-            # Generate description (via Ollama)
-            self.personality_description = self.ollama_client.calculate_personality_description(self.personality, self.sex)
-            # Save to file
-            self._save_personality(personality_file)
-
-    def _save_personality(self, file_path):
-        """Saves the current personality and description to a JSON file."""
-        data_to_save = {
-            "personality": self.personality,
-            "personality_description": self.personality_description
-        }
-        try:
-            # Ensure directory exists just before writing (redundant if called after _load_or_generate_personality, but safe)
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, 'w') as f:
-                json.dump(data_to_save, f, indent=4)
-            print(f"Saved personality for {self.full_name} to {file_path}")
-        except IOError as e:
-            print(f"Error saving personality for {self.full_name} to {file_path}: {e}")
