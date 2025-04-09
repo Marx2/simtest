@@ -1,8 +1,13 @@
 # aisim/src/core/panel.py
 import pygame
 import os
+# from __future__ import annotations # Not strictly necessary if using string hints
+from typing import Optional
 from aisim.src.core.configuration import config_manager
 from aisim.src.core.mood import get_mood_description
+# Forward declare Sim type hint to avoid circular import issues
+if False: # This block is never executed but helps type checkers
+    from aisim.src.core.sim import Sim
 
 # Font will be initialized lazily inside draw_bubble
 PANEL_FONT = None
@@ -13,7 +18,8 @@ PANEL_EMOJI_FONT_PATH = config_manager.get_entry('sim.panel_font_emoji_dir') # A
 # Get colors from config with defaults
 TEXT_COLOR = tuple(config_manager.get_entry('ui.text_color', [240, 240, 240]))
 BG_COLOR = tuple(config_manager.get_entry('ui.bg_color', [50, 50, 50, 180]))
-
+HIGH_ROMANCE_THRESHOLD = config_manager.get_entry('simulation.high_romance_threshold', 0.7)
+RED_COLOR = (255, 0, 0)
 def is_emoji(char):
     """Returns True if the character is likely an emoji."""
     # Using a simple codepoint range check is often sufficient and avoids
@@ -109,7 +115,7 @@ def wrap_text_compact(text, font, max_width):
         lines.append(' '.join(current_line))
     return lines
 
-def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_color=BG_COLOR, max_width=150, padding=10, offset_y=-30):
+def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_color=BG_COLOR, max_width=150, padding=10, offset_y=-30, sim1: Optional['Sim'] = None, sim2: Optional['Sim'] = None):
     """Draws a text bubble above a given position."""
     global PANEL_FONT, PANEL_EMOJI_FONT # Declare intent to modify the global variables
 
@@ -175,6 +181,15 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
     if not text or not font: # Also check if font initialization failed
         return
 
+    # Determine text color based on romance level if sims are provided
+    final_text_color = text_color # Start with default
+    if sim1 and sim2:
+        # Check relationship from sim1's perspective (the owner of the bubble)
+        relation_to_sim2 = sim1.relationships.get(sim2.sim_id)
+        if relation_to_sim2 and relation_to_sim2.get("romance", 0.0) >= HIGH_ROMANCE_THRESHOLD:
+            final_text_color = RED_COLOR # Red color for high romance
+            # print(f"Debug: High romance detected between {sim1.first_name} and {sim2.first_name}. Using RED.") # Optional debug
+
     lines = wrap_text_compact(text, font, max_width)
     if not lines: # Don't draw if wrapping results in no lines
         return
@@ -223,7 +238,7 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
                 if current_segment_text and prev_font: # Ensure segment and font are valid
                     try:
                         # Render to measure actual dimensions
-                        temp_surf = prev_font.render(current_segment_text, True, text_color)
+                        temp_surf = prev_font.render(current_segment_text, True, final_text_color) # Use final_text_color
                         original_width = temp_surf.get_width()
                         original_height = temp_surf.get_height()
 
@@ -268,7 +283,7 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
             if last_font:
                 try:
                     # Render to measure actual dimensions
-                    temp_surf = last_font.render(current_segment_text, True, text_color)
+                    temp_surf = last_font.render(current_segment_text, True, final_text_color) # Use final_text_color
                     original_width = temp_surf.get_width()
                     original_height = temp_surf.get_height()
 
@@ -353,7 +368,7 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
                 continue
             try:
                 # Re-render the segment
-                text_surface = segment['font'].render(segment['text'], True, text_color)
+                text_surface = segment['font'].render(segment['text'], True, final_text_color) # Use final_text_color
 
                 # Scale if it's an emoji segment and scaling is needed
                 blit_surface = text_surface

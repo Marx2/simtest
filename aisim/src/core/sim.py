@@ -330,11 +330,14 @@ class Sim:
 
         # Draw conversation or thought bubble using the imported function
         bubble_text = None
+        bubble_text = None
+        is_conversation = False # Flag to track bubble type
         if self.conversation_message:
             # Decrement timer only when message exists
             self.conversation_message_timer -= dt # Use delta time for consistent display
             if self.conversation_message_timer > 0: # Check if timer still positive
                  bubble_text = self.conversation_message
+                 is_conversation = True # It's a conversation bubble
             else:
                  self.conversation_message = None # Clear message after time
                  self.conversation_message_timer = 0.0 # Reset timer
@@ -342,26 +345,36 @@ class Sim:
              # Handle non-conversation thought display timer (if needed, or remove if thoughts are transient)
              # Assuming current_thought display is handled by its own timer logic elsewhere
              bubble_text = self.current_thought
+             # Keep is_conversation as False
 
-        if bubble_text and self.conversation_message_timer >= 0:
-            # Check for overlapping bubbles
-            if self.is_interacting and self.conversation_partner_id:
+        if bubble_text: # Check if timer > 0 removed as it's handled above
+            # --- Determine arguments for draw_bubble ---
+            sim1_arg = self
+            sim2_arg = None
+            partner = None # Initialize partner
+
+            if is_conversation and self.conversation_partner_id:
                 partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-                if partner and partner.conversation_message:
-                    distance = self.x - partner.x
-                    bubble_width = 150  # Static bubble width from panel.py
-                    if abs(distance) < bubble_width:
-                        # Alternate bubble position (left/right)
-                        if self.sim_id > partner.sim_id:  # Ensure consistent ordering
-                            bubble_x_offset = -bubble_width  # Move left
-                        else:
-                            bubble_x_offset = bubble_width  # Move right
-                        # Get original bubble position
-                        bubble_x = sim_pos[0]
-                        # Apply offset
-                        sim_pos = (int(bubble_x + bubble_x_offset), sim_pos[1])
+                if partner:
+                    sim2_arg = partner # Set partner as sim2 for romance check
 
-            draw_bubble(screen, bubble_text, sim_pos) # Use the imported function
+            # --- Handle Overlapping Bubbles (if still needed, based on partner found) ---
+            bubble_pos = sim_pos # Start with original position
+            if is_conversation and partner and partner.conversation_message: # Check if partner *also* has a message
+                distance = self.x - partner.x
+                # Use config or a constant for bubble width if needed for overlap check
+                bubble_width_estimate = 150
+                if abs(distance) < bubble_width_estimate:
+                    # Alternate bubble position based on relative position or ID
+                    # Let's try moving *this* bubble slightly if partner is to the left
+                    if partner.x < self.x:
+                         bubble_pos = (sim_pos[0] + bubble_width_estimate // 4, sim_pos[1])
+                    else:
+                         bubble_pos = (sim_pos[0] - bubble_width_estimate // 4, sim_pos[1])
+                    # More sophisticated overlap avoidance might be needed
+
+            # --- Call draw_bubble with Sim arguments ---
+            draw_bubble(screen, bubble_text, bubble_pos, sim1=sim1_arg, sim2=sim2_arg)
 
 
     def _load_or_generate_personality(self, sim_config: Dict):
