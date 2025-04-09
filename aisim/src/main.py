@@ -20,7 +20,7 @@ print(f"Python sys.path: {sys.path}")
 SCREEN_WIDTH = config_manager.get_entry('simulation.screen_width', 800) # Default width
 SCREEN_HEIGHT = config_manager.get_entry('simulation.screen_height', 600) # Default height
 WINDOW_TITLE = config_manager.get_entry('simulation.window_title', "AI Simulation") # Default title
-
+THOUGHT_DURATION = config_manager.get_entry('simulation.thought_duration')  # Seconds to display thought bubble
 
 def main():
     # Get config values using the centralized manager
@@ -363,7 +363,6 @@ def main():
                 SCREEN_HEIGHT
             )
 
-       # --- Draw Test Bubble ---
         # --- Draw Test Bubble ---
         if show_test_bubble:
             test_text = "Test Bubble! 👋🤔🎉✨ Emojis!"
