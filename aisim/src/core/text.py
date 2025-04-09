@@ -1,6 +1,6 @@
 import pygame
 import os
-from typing import Optional
+from typing import Optional, Tuple, List, Dict, Any
 # from aisim.src.core.sim import Sim
 from aisim.src.core.configuration import config_manager
 
@@ -231,7 +231,73 @@ def format_text(text_lines, font, emoji_font, text_color, target_emoji_height):
         'total_content_height': total_content_height
     }
 
+# --- Helper Function ---
+def _render_bubble_surface(bubble_width: int, bubble_height: int, bg_color: Tuple[int, int, int, int]) -> Optional[pygame.Surface]:
+    """Creates the bubble background surface."""
+    try:
+        # Ensure integer dimensions and non-negative values
+        width = max(1, int(bubble_width))
+        height = max(1, int(bubble_height))
+        bubble_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+        bubble_surface.fill((0, 0, 0, 0))  # Ensure transparent background
+        pygame.draw.rect(bubble_surface, bg_color, bubble_surface.get_rect(), border_radius=5)
+        return bubble_surface
+    except (pygame.error, ValueError) as e: # Catch potential errors like negative size or memory issues
+        print(f"Error creating bubble surface (width={bubble_width}, height={bubble_height}): {e}")
+        return None # Indicate failure
 
+# --- Text Rendering Helper ---
+def _render_text_on_bubble(
+    bubble_surface: pygame.Surface,
+    measured_lines: List[Dict[str, Any]],
+    bubble_width: int,
+    padding: int,
+    final_text_color: Tuple[int, int, int]
+):
+    """Renders the formatted text segments onto the bubble surface."""
+    current_y = padding
+    for line_data in measured_lines:
+        if not line_data.get('segments'):
+            current_y += line_data['height']
+            continue
+
+        start_x = max(padding, (bubble_width - line_data['width']) // 2)
+        current_x = start_x
+        line_bottom_y = current_y + line_data['height']
+
+        for segment in line_data['segments']:
+            if not segment['font']:
+                print(f"Warning: Font missing for segment '{segment['text']}'. Skipping render.")
+                continue
+            try:
+                text_surface = segment['font'].render(segment['text'], True, final_text_color)
+                blit_surface = text_surface
+                blit_width = segment['width']
+                blit_height = segment['height']
+                original_width = segment['original_width']
+                original_height = segment['original_height']
+
+                if segment['is_emoji'] and (blit_width != original_width or blit_height != original_height):
+                    try:
+                        blit_surface = pygame.transform.smoothscale(text_surface, (blit_width, blit_height))
+                    except (ValueError, pygame.error) as scale_err:
+                        print(f"Error scaling surface for '{segment['text']}': {scale_err}. Using original.")
+                        blit_surface = text_surface
+                        blit_width = original_width
+                        blit_height = original_height
+
+                segment_rect = blit_surface.get_rect(left=int(current_x), bottom=int(line_bottom_y))
+                bubble_surface.blit(blit_surface, segment_rect)
+                current_x += blit_width
+
+            except pygame.error as e:
+                print(f"Error rendering segment '{segment['text']}' with font {segment['font']}: {e}")
+            except AttributeError:
+                print(f"Error: Font object invalid for segment '{segment['text']}'. Font: {segment['font']}")
+
+        current_y = line_bottom_y
+
+# --- Main Function ---
 def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_color=BG_COLOR, max_width=150, padding=10, offset_y=-30, sim1: Optional['Sim'] = None, sim2: Optional['Sim'] = None):
     """Draws a text bubble above a given position."""
 
@@ -271,79 +337,22 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
     # Bubble position calculation remains the same
     bubble_x = position[0] - bubble_width // 2
     bubble_y = position[1] + offset_y - bubble_height # Position above the target point
-    screen_height = screen.get_height()
     if bubble_y < 0:
         bubble_y = 0
 
-    # --- Bubble Render Phase ---
-    # Surface creation uses updated bubble_height
-    try:
-        bubble_surface = pygame.Surface((int(bubble_width), int(bubble_height)), pygame.SRCALPHA) # Ensure integer dimensions
-        bubble_surface.fill((0,0,0,0)) # Ensure transparent background
-        pygame.draw.rect(bubble_surface, bg_color, bubble_surface.get_rect(), border_radius=5)
-    except (pygame.error, ValueError) as e: # Catch potential errors like negative size
-         print(f"Error creating bubble surface (width={bubble_width}, height={bubble_height}): {e}")
+    # --- Bubble Render Phase (Using Helper) ---
+    bubble_surface = _render_bubble_surface(bubble_width, bubble_height, bg_color)
+    if bubble_surface is None:
          return # Cannot proceed if surface creation fails
 
-    # --- Text Render Phase (using formatted_data) ---
-    current_y = padding
-    for line_data in measured_lines: # Use measured_lines from formatted_data
-        if not line_data.get('segments'): # Check if line has segments (handles empty lines correctly)
-            current_y += line_data['height'] # Advance Y based on stored height
-            continue
-
-        # Center the line horizontally based on its measured width
-        start_x = (bubble_width - line_data['width']) // 2
-        start_x = max(padding, start_x) # Ensure it respects padding
-
-        current_x = start_x
-        line_bottom_y = current_y + line_data['height'] # Pre-calculate the bottom edge for this line
-
-        for segment in line_data['segments']:
-            if not segment['font']:
-                print(f"Warning: Font missing for segment '{segment['text']}'. Skipping render.")
-                continue
-            try:
-                # 1. Re-render the original segment text
-                text_surface = segment['font'].render(segment['text'], True, final_text_color)
-
-                # 2. Determine blit surface and dimensions (use pre-calculated)
-                blit_surface = text_surface
-                blit_width = segment['width'] # Use pre-calculated width
-                blit_height = segment['height'] # Use pre-calculated height
-
-                # 3. Scale if necessary (only if emoji and dimensions differ)
-                original_width = segment['original_width']
-                original_height = segment['original_height']
-                if segment['is_emoji'] and (blit_width != original_width or blit_height != original_height):
-                     try:
-                         # Use the pre-calculated blit_width and blit_height for scaling target
-                         blit_surface = pygame.transform.smoothscale(text_surface, (blit_width, blit_height))
-                     except (ValueError, pygame.error) as scale_err:
-                         print(f"Error scaling surface for '{segment['text']}': {scale_err}. Using original.")
-                         # Fallback to original surface and dimensions if scaling fails
-                         blit_surface = text_surface
-                         blit_width = original_width
-                         blit_height = original_height
-
-                # 4. Calculate blit position
-                segment_rect = blit_surface.get_rect()
-                segment_rect.left = int(current_x)
-                # Align bottom edge to the pre-calculated line bottom edge
-                segment_rect.bottom = int(line_bottom_y)
-
-                # 5. Blit the (potentially scaled) surface
-                bubble_surface.blit(blit_surface, segment_rect)
-
-                # 6. Advance X position
-                current_x += blit_width # Advance by the width used for blitting
-
-            except pygame.error as e:
-                 print(f"Error rendering segment '{segment['text']}' with font {segment['font']}: {e}")
-            except AttributeError:
-                 print(f"Error: Font object invalid for segment '{segment['text']}'. Font: {segment['font']}")
-
-        current_y = line_bottom_y # Move to the start of the next line (which is the bottom of the current line)
+    # --- Text Render Phase (Using Helper) ---
+    _render_text_on_bubble(
+        bubble_surface,
+        measured_lines,
+        bubble_width,
+        padding,
+        final_text_color
+    )
 
     # Blit the complete bubble surface onto the main screen
     screen.blit(bubble_surface, (int(bubble_x), int(bubble_y))) # Ensure integer coordinates
