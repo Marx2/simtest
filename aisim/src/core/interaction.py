@@ -11,6 +11,7 @@ __all__ = ['check_interactions', '_end_interaction'] # Explicitly export functio
 
 INTERACTION_DISTANCE = config_manager.get_entry('simulation.interaction_distance')  # Max distance for interaction (pixels)
 THOUGHT_DURATION = config_manager.get_entry('simulation.thought_duration')  # Seconds to display thought bubble
+ENABLE_TALKING = config_manager.get_entry('simulation.enable_talking', False)
 
 def check_interactions(self, all_sims, logger, current_time, city): # Add city parameter
     """Checks for and handles interactions with nearby Sims, logging them."""
@@ -53,19 +54,13 @@ def check_interactions(self, all_sims, logger, current_time, city): # Add city p
                 other_sim.y -= norm_dy * move_dist
 
             # --- Initialize Conversation ---
-            if self.enable_talking and other_sim.enable_talking:
+            if ENABLE_TALKING == True:
                 initiate_conversation(self, other_sim, city, all_sims, current_time)
 
-            # If talking is disabled, or if the global lock prevented the conversation:
-            # The sims might still be close enough to trigger the initial `if dist < INTERACTION_DISTANCE...`
-            # but we don't want them to get stuck in `is_interacting = True` if no conversation happened.
-            # The code now correctly avoids setting `is_interacting = True` unless the conversation lock passes.
-            # If talking was disabled from the start:
-            elif not self.enable_talking or not other_sim.enable_talking:
-                 # Mark as non-talking interaction (if needed for other logic)
-                 # but DO NOT set is_interacting = True here.
+            else:
                  self.conversation_history = None
                  other_sim.conversation_history = None
+            
 
         # TODO: Use personality traits to influence interaction chance/outcome
 
@@ -384,7 +379,7 @@ def _send_conversation_request(speaker, listener, city, all_sims, current_time: 
 def _generate_thought(self, situation_description):
     """Requests non-conversational thought generation asynchronously using Ollama."""
     # Only generate if talking is enabled AND not currently in a conversation
-    if self.enable_talking and not self.is_interacting:
+    if ENABLE_TALKING == True:
         print(f"Sim {self.sim_id}: Requesting standard thought for: {situation_description}")
         request_sent = self.ollama_client.request_thought_generation(self.sim_id, situation_description)
         if not request_sent:

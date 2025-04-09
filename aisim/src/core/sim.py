@@ -17,7 +17,7 @@ pygame.font.init()
 class Sim:
     """Represents a single Sim in the simulation."""
 
-    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, enable_talking: bool, sim_config: Dict, bubble_display_time: float = 5.0):
+    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, sim_config: Dict, bubble_display_time: float = 5.0):
         """Initializes a Sim with ID, position, Ollama client, config, and bubble display time."""
         self.sim_id = sim_id  # Store the unique ID
         self.is_interacting = False
@@ -54,8 +54,6 @@ class Sim:
         self.relationships = {}  # Key: other_sim_id, Value: {"friendship": float, "romance": float}
         self.mood = 0.0  # -1.0 (Sad) to 1.0 (Happy)
         self.last_interaction_time = 0.0  # Time of last interaction
-        self.enable_talking = enable_talking
-        self.can_talk = False  # Flag to control thought generation (might be deprecated by conversation logic)
         # Animation attributes
         self.animation_frame = 0
         self.animation_timer = 0.0
