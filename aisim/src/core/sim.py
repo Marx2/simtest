@@ -10,25 +10,8 @@ from aisim.src.core.personality import _assign_sex, load_or_generate_personality
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
 TILE_SIZE = config_manager.get_entry('city.tile_size', 32) # Add default value
-
-def get_character_names():
-    """Extracts character names from sprite filenames in the specified directory."""
-    names = []
-    character_sprite_dir = config_manager.get_entry('sim.character_sprite_dir')
-    if not character_sprite_dir or not os.path.isdir(character_sprite_dir):
-        print(f"Error: Character sprite directory not found or not configured: {character_sprite_dir}")
-        return []
-    for filename in os.listdir(character_sprite_dir):
-        if filename.endswith(".png"):
-            name = filename[:-4]  # Remove ".png" extension
-            names.append(name)
-    return names
-
-CHARACTER_NAMES = get_character_names()
-
 # Initialize font - needs pygame.init() - Ensure font module is initialized
 pygame.font.init()
-
 class Sim:
     """Represents a single Sim in the simulation."""
 
