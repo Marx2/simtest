@@ -222,7 +222,7 @@ def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time
 
     # --- Interaction Check ---
     # Pass the city object to check_interactions
-    check_interactions(sim, all_sims, logger, current_time, city)
+    # check_interactions(sim, all_sims, logger, current_time, city)
     # Clamp mood
     sim.mood = max(-1.0, min(sim.mood, 1.0))
 

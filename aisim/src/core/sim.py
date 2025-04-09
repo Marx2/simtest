@@ -91,9 +91,7 @@ class Sim:
             if not self.is_interacting:
                  return # Interaction ended, stop further processing in update
 
-        # if logger:
-        #     print(f"Sim {self.sim_id} update: x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}")
-        if not self.is_interacting:
+        else:
             if not self.path:
                 target_x = random.randint(0, city.grid_width - 1) * TILE_SIZE
                 target_y = random.randint(0, city.grid_height - 1) * TILE_SIZE
@@ -287,7 +285,7 @@ class Sim:
             # Fallback: draw a colored circle
             pygame.draw.circle(screen, self.sim_color, sim_pos, self.sim_radius) # Use configured fallback color and radius
 
-        # --- Bubble Display Logic ---
+        # # --- Bubble Display Logic ---
         bubble_text_to_display = None
         is_conversation = False
         partner = None
@@ -295,6 +293,7 @@ class Sim:
         # Find partner if interacting
         if self.is_interacting and self.conversation_partner_id:
             partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
+        print(f"Sim {self.sim_id}: Partner found: {partner}")
 
         # Decrement conversation timer if message exists
         if self.conversation_message:
@@ -332,6 +331,7 @@ class Sim:
                  bubble_text_to_display = None
 
         # --- Draw Bubble if text is available ---
+        print(f"SIM {self.character_name} Drawing bubble: {bubble_text_to_display == True}")
         if bubble_text_to_display:
             # Determine arguments for draw_bubble (for romance coloring)
             sim1_arg = self

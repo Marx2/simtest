@@ -1,10 +1,8 @@
 import math
-import time
 from typing import List
 import logging
 logging.basicConfig(level=logging.DEBUG)
 from aisim.src.core.configuration import config_manager
-import json
 import random # Import random
 
 __all__ = ['check_interactions', '_end_interaction'] # Explicitly export functions
