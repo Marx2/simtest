@@ -13,7 +13,7 @@ from aisim.src.core.logger import Logger
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core import interaction
 from aisim.src.core.panel import draw_panel_details
-from aisim.src.core.text import draw_bubble
+from aisim.src.core.text import draw_bubble,initialize_fonts
 
 print(f"Current working directory: {os.getcwd()}")
 print(f"Python sys.path: {sys.path}")
@@ -28,9 +28,9 @@ def main():
     initial_sims = config_manager.get_entry('simulation.initial_sims', 10)
     bubble_display_time = config_manager.get_entry('simulation.bubble_display_time_seconds', 5.0)
     sim_creation_config = config_manager.get_entry('sim', {}) # Pass the whole 'sim' section if Sim expects it
-    weather_config = config_manager.get_entry('weather', {}) # Get weather specific config
     movement_direction_change_frequency = config_manager.get_entry('movement.direction_change_frequency', 5.0)
     pygame.init() # Pygame init needs to happen before font loading in Sim
+    initialize_fonts()
     # Create AI Client
     ollama_client = OllamaClient() # Reads its own config section
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))

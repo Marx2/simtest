@@ -5,6 +5,7 @@ from typing import Optional
 from aisim.src.core.configuration import config_manager
 
 # Font will be initialized lazily inside draw_bubble
+# global PANEL_FONT, PANEL_EMOJI_FONT # Declare intent to modify the global variables
 PANEL_FONT = None
 PANEL_EMOJI_FONT = None
 PANEL_FONT_PATH = config_manager.get_entry('sim.panel_font_dir')
@@ -14,23 +15,26 @@ HIGH_ROMANCE_THRESHOLD = config_manager.get_entry('simulation.high_romance_thres
 # Get colors from config with defaults
 TEXT_COLOR = tuple(config_manager.get_entry('ui.text_color', [240, 240, 240]))
 BG_COLOR = tuple(config_manager.get_entry('ui.bg_color', [50, 50, 50, 180]))
+RED_COLOR = (255, 0, 0)
 
-def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_color=BG_COLOR, max_width=150, padding=10, offset_y=-30, sim1: Optional['Sim'] = None, sim2: Optional['Sim'] = None):
-    """Draws a text bubble above a given position."""
-    global PANEL_FONT, PANEL_EMOJI_FONT # Declare intent to modify the global variables
-
-    # Lazy font initialization
+def initialize_fonts(font=None):
+    global PANEL_FONT, PANEL_EMOJI_FONT
     if font is None:
         # Initialize regular font
         if PANEL_FONT is None:
             try:
                 if not pygame.font.get_init(): pygame.font.init()
                 if PANEL_FONT_PATH and os.path.exists(PANEL_FONT_PATH):
-                    PANEL_FONT = pygame.font.Font(PANEL_FONT_PATH, 14)  # Regular text at 14px
-                    print(f"Loaded panel font: {PANEL_FONT_PATH}")
+                    try:
+                        PANEL_FONT = pygame.font.Font(PANEL_FONT_PATH, 14)  # Regular text at 14px
+                        print(f"Loaded panel font: {PANEL_FONT_PATH}")
+                    except pygame.error as e:
+                        print(f"Error loading font {PANEL_FONT_PATH}: {e}")
+                        PANEL_FONT = pygame.font.SysFont(None, 14) # Fallback
+                        print("Using fallback system font.")
                 else:
                     PANEL_FONT = pygame.font.SysFont(None, 14) # Fallback
-                    print(f"Panel font path not found or invalid, using SysFont: {PANEL_FONT_PATH}")
+                    print(f"Panel font path not found or invalid: {PANEL_FONT_PATH}. Using fallback system font.")
             except pygame.error as e:
                  print(f"Error initializing panel font '{PANEL_FONT_PATH}': {e}")
                  return # Cannot draw without a font
@@ -77,7 +81,12 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
 
         # Use the global default if no specific font passed in the function call
         font = PANEL_FONT # Main font reference
+        return font
 
+def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_color=BG_COLOR, max_width=150, padding=10, offset_y=-30, sim1: Optional['Sim'] = None, sim2: Optional['Sim'] = None):
+    """Draws a text bubble above a given position."""
+
+    font = initialize_fonts(font) # Initialize fonts if not already done
     if not text or not font: # Also check if font initialization failed
         return
 
