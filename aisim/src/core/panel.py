@@ -443,23 +443,27 @@ def draw_panel_details(screen, detailed_sim, panel_scroll_offset, sims_dict, ui_
     pers_lines = wrap_text(detailed_sim.personality_description, log_font, panel_width - 2 * padding - scrollbar_width)
     estimated_content_height += len(pers_lines) * line_h_log + line_spacing
 
-    # Height for Relationships
+    # Height for Romance Section
     estimated_content_height += line_h_log # Title
     if detailed_sim.relationships:
          estimated_content_height += len(detailed_sim.relationships) * line_h_log
     else:
          estimated_content_height += line_h_log # "None" line
-    estimated_content_height += line_spacing # Space before next section
+    # estimated_content_height += line_spacing # Space before next section (if any)
+    estimated_content_height += line_spacing # Space before conv history
 
-    # Height for Memory (Last 10 entries)
+    # Height for Conversation History
     estimated_content_height += line_h_log # Title
-    memory_to_display = detailed_sim.memory[-10:] # Get last 10
-    if memory_to_display:
-         # Assuming each memory entry is a string and takes one line for estimation
-         # More complex wrapping isn't estimated here for simplicity, but handled in drawing
-         estimated_content_height += len(memory_to_display) * line_h_log
+    content_width_for_estimation = panel_width - 2 * padding - scrollbar_width # Width for wrapping text
+    if detailed_sim.conversation_history:
+        for entry in detailed_sim.conversation_history:
+            role = entry.get('role', '??')
+            content = entry.get('content', '')
+            entry_text = f"{role.capitalize()}: {content}"
+            wrapped_lines = wrap_text(entry_text, log_font, content_width_for_estimation)
+            estimated_content_height += len(wrapped_lines) * line_h_log
     else:
-         estimated_content_height += line_h_log # "None" line
+        estimated_content_height += line_h_log # "None" line
 
     estimated_content_height += padding # Bottom padding
     estimated_content_height += padding # Bottom padding
@@ -561,15 +565,15 @@ def draw_panel_details(screen, detailed_sim, panel_scroll_offset, sims_dict, ui_
         screen.blit(line_surf, (panel_x + padding, current_y))
         current_y += line_h_log
 
-    # Relationships
+    # Romance Section
     current_y += line_spacing # Add space before section
-    rel_title_surf = log_font.render("Relationships:", True, text_color)
-    screen.blit(rel_title_surf, (panel_x + padding, current_y))
+    rom_title_surf = log_font.render("Romance:", True, text_color)
+    screen.blit(rom_title_surf, (panel_x + padding, current_y))
     current_y += line_h_log
 
     if detailed_sim.relationships:
         for other_id, values in sorted(detailed_sim.relationships.items()): # Sort for consistent order
-            # Simple visibility checks like above
+            # Simple visibility checks
             if current_y > panel_y + panel_height: break
             if current_y + line_h_log < panel_y:
                 current_y += line_h_log
@@ -579,33 +583,38 @@ def draw_panel_details(screen, detailed_sim, panel_scroll_offset, sims_dict, ui_
             other_name = other_sim.full_name if other_sim else f"Unknown ({other_id[:6]})"
             friendship = values.get('friendship', 0.0)
             romance = values.get('romance', 0.0)
-            rel_text = f"- {other_name}: F={friendship:.1f}"
-            if 'romance' in values:
-                rel_text += f", R={romance:.1f}"
-            rel_surf = log_font.render(rel_text, True, text_color)
-            screen.blit(rel_surf, (panel_x + padding, current_y))
+
+            # Determine color based on romance level
+            current_text_color = RED_COLOR if romance >= HIGH_ROMANCE_THRESHOLD else text_color
+
+            # Format text
+            rom_text = f"- {other_name}: F={friendship:.1f}, R={romance:.1f}"
+            rom_surf = log_font.render(rom_text, True, current_text_color) # Use determined color
+            screen.blit(rom_surf, (panel_x + padding, current_y))
             current_y += line_h_log
     else:
-         # Simple visibility checks like above
+         # Simple visibility checks
          if not (current_y > panel_y + panel_height or current_y + line_h_log < panel_y):
-            no_rel_surf = log_font.render("- None", True, text_color)
-            screen.blit(no_rel_surf, (panel_x + padding, current_y))
+            no_rom_surf = log_font.render("- None", True, text_color)
+            screen.blit(no_rom_surf, (panel_x + padding, current_y))
          current_y += line_h_log # Still advance Y
 
-    # Memory (Last 10 entries)
+    # Conversation History
     current_y += line_spacing # Add space before section
-    mem_title_surf = log_font.render("Memory (Last 10):", True, text_color)
-    screen.blit(mem_title_surf, (panel_x + padding, current_y))
+    conv_title_surf = log_font.render("Conversation History:", True, text_color)
+    screen.blit(conv_title_surf, (panel_x + padding, current_y))
     current_y += line_h_log
 
-    memory_to_display = detailed_sim.memory[-10:] # Get last 10 entries
-    if memory_to_display:
-        content_width = panel_width - 2 * padding - scrollbar_width # Available width for text
-        for entry in memory_to_display:
-            # Wrap memory entry text if needed
-            wrapped_lines = wrap_text(str(entry), log_font, content_width) # Ensure entry is string
+    content_width = panel_width - 2 * padding - scrollbar_width # Available width for text
+    if detailed_sim.conversation_history:
+        for entry in detailed_sim.conversation_history:
+            role = entry.get('role', '??')
+            content = entry.get('content', '')
+            entry_text = f"{role.capitalize()}: {content}"
+            # Wrap conversation entry text if needed
+            wrapped_lines = wrap_text(entry_text, log_font, content_width)
             for line in wrapped_lines:
-                # Simple visibility checks like above
+                # Simple visibility checks
                 if current_y > panel_y + panel_height: break
                 if current_y + line_h_log < panel_y:
                     current_y += line_h_log
@@ -616,12 +625,11 @@ def draw_panel_details(screen, detailed_sim, panel_scroll_offset, sims_dict, ui_
                 current_y += line_h_log
             if current_y > panel_y + panel_height: break # Break outer loop too if needed
     else:
-        # Simple visibility checks like above
+        # Simple visibility checks
         if not (current_y > panel_y + panel_height or current_y + line_h_log < panel_y):
-            no_mem_surf = log_font.render("- None", True, text_color)
-            screen.blit(no_mem_surf, (panel_x + padding, current_y))
+            no_conv_surf = log_font.render("- None", True, text_color)
+            screen.blit(no_conv_surf, (panel_x + padding, current_y))
         current_y += line_h_log # Still advance Y
-
 
     # --- Remove Clipping ---
     screen.set_clip(None)
