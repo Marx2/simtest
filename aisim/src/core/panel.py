@@ -608,9 +608,9 @@ def draw_panel_details(screen, detailed_sim, panel_scroll_offset, sims_dict, ui_
     content_width = panel_width - 2 * padding - scrollbar_width # Available width for text
     if detailed_sim.conversation_history:
         for entry in detailed_sim.conversation_history:
-            role = entry.get('role', '??')
-            content = entry.get('content', '')
-            entry_text = f"{role.capitalize()}: {content}"
+            speaker = entry.get('speaker', 'Unknown') # Use 'speaker' key
+            line = entry.get('line', '') # Use 'line' key
+            entry_text = f"{speaker}: {line}" # Format with correct variables
             # Wrap conversation entry text if needed
             wrapped_lines = wrap_text(entry_text, log_font, content_width)
             for line in wrapped_lines:
