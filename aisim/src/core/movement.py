@@ -1,7 +1,6 @@
 import networkx as nx
 import math
 import random
-from aisim.src.core.sim import check_interactions
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
 TILE_SIZE = config_manager.get_entry('city.tile_size')
@@ -103,9 +102,6 @@ def movement_update(sim, dt, city, weather_state, all_sims, current_time, tile_s
                 sim.path = None
                 sim.target = None
                 sim.path_index = 0
-                # Generate thought upon arrival
-                situation = f"arrived at location ({int(sim.x)}, {int(sim.y)}) on a {weather_state} day"
-                # sim._generate_thought(situation)
                 sim.mood = min(1.0, sim.mood + 0.1) # Mood boost for reaching destination
         else: # Move towards waypoint
             # Normalize direction vector
@@ -195,19 +191,6 @@ def movement_update(sim, dt, city, weather_state, all_sims, current_time, tile_s
                 sim.previous_angle = new_angle
                 sim.time_since_last_direction_change = 0.0  # Reset the timer
                 sim.animation_frame = 0 # Reset animation frame
-                    # print(f"Sim {sim.sim_id}: Direction changed to {sim.current_direction}")
-            # Increment the timer
-            # print(f"Sim {sim.sim_id}: Moving, direction={sim.current_direction}")
-    # Update thought timer
-    if sim.current_thought:
-        sim.thought_timer -= dt
-        if sim.thought_timer <= 0:
-            sim.current_thought = None
-    # else:
-    #      # Path finished or invalid state, try finding a new one next update
-    #      sim.path = None
-    #      sim.target = None
-    #      sim.path_index = 0
 
     # --- Mood Update based on Weather ---
     if weather_state in ["Rainy", "Snowy"]:

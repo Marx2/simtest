@@ -5,8 +5,6 @@ from unittest.mock import MagicMock, patch
 from aisim.src.core.sim import Sim
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.city import City
-from aisim.src.core.configuration import config_manager
-# Import the functions directly from the interaction module
 from aisim.src.core.interaction import handle_ollama_response, initiate_conversation, _send_conversation_request
 
 class TestConversation(unittest.TestCase):
@@ -125,7 +123,6 @@ class TestConversation(unittest.TestCase):
         response_processed = False
         start_time = time.time()
         timeout = 10.0 # seconds
-        processed_sim_id = None # Keep track of which sim's response was processed
 
         while time.time() - start_time < timeout:
             result = self.ollama_client.check_for_thought_results()
@@ -137,7 +134,6 @@ class TestConversation(unittest.TestCase):
                 if sim_instance:
                      # Call the handler function from the interaction module
                      handle_ollama_response(sim_instance, response_text, time.time(), all_sims, city)
-                     processed_sim_id = sim_id
                      # Check if the response was for the first speaker
                      if sim_id == first_speaker.sim_id:
                            response_processed = True

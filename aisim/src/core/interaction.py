@@ -8,9 +8,9 @@ import random # Import random
 __all__ = ['check_interactions', '_end_interaction'] # Explicitly export functions
 
 INTERACTION_DISTANCE = config_manager.get_entry('simulation.interaction_distance')  # Max distance for interaction (pixels)
-THOUGHT_DURATION = config_manager.get_entry('simulation.thought_duration')  # Seconds to display thought bubble
 ENABLE_TALKING = config_manager.get_entry('simulation.enable_talking', False)
 BUBBLE_DISPLAY_TIME = config_manager.get_entry('simulation.bubble_display_time_seconds', 5.0)
+MAX_TOTAL_TURNS = config_manager.get_entry('ollama.conversation_max_turns', 4)
 
 def check_interactions(self, all_sims, current_time, city): # Add city parameter
     """Checks for and handles interactions with nearby Sims"""
@@ -163,7 +163,7 @@ def handle_ollama_response(self, response_text: str, all_sims: List['Sim'], city
     print(f"Sim {self.sim_id}: Received Ollama response: '{response_text}'")
 
     # --- Release Ollama Lock ---
-    # This function is called when *any* Ollama response arrives (thought or conversation).
+    # This function is called when *any* Ollama response arrives (conversation).
     # The lock should only be held during conversation request/response cycles.
     # Release the lock if this response corresponds to the end of a conversation turn.
     # Note: The lock is acquired in _initiate_conversation or conversation_update.
@@ -207,22 +207,16 @@ def handle_ollama_response(self, response_text: str, all_sims: List['Sim'], city
         # self.conversation_last_response_time = current_time # Don't reset self timer here, used for timeout *before* speaking
 
         # Check if max turns reached *after* this turn
-        # Ensure max_total_turns is read correctly, use a default if missing
-        max_total_turns = config_manager.get_entry('ollama.conversation_max_turns', 4)
         # Calculate max turns *per sim* based on total turns. Each sim speaks roughly half the total turns.
         # Use ceil division equivalent to handle odd max_total_turns gracefully: (N + 1) // 2
-        max_turns_per_sim = (max_total_turns + 1) // 2
+        max_turns_per_sim = (MAX_TOTAL_TURNS + 1) // 2
 
         if self.conversation_turns >= max_turns_per_sim:
             print(f"Sim {self.sim_id}: Reached max turns ({self.conversation_turns}/{max_turns_per_sim}) in conversation with {self.conversation_partner_id}. Ending interaction.")
             _end_interaction(self, city, all_sims) # End interaction after reaching max turns
 
-    elif not self.is_interacting: # Only process as thought if NOT interacting
-        # --- Handle Regular Thought ---
-        # (Ensure this logic doesn't run if interaction ended *during* this function)
-        self.current_thought = response_text
-        self.thought_timer = THOUGHT_DURATION
-        # Ensure conversation bubble is cleared if a thought comes in while not interacting
+    elif not self.is_interacting:
+        # Ensure conversation bubble is cleared while not interacting
         self.conversation_message = None
         self.conversation_message_timer = 0.0
 
@@ -355,12 +349,3 @@ def _send_conversation_request(speaker, listener, current_time: float) -> bool:
         logging.error(f"Sim {speaker.sim_id}: Unexpected error sending conversation request: {e}")
         # DO NOT release lock here - caller handles it based on False return
         return False
-
-def _generate_thought(self, situation_description):
-    """Requests non-conversational thought generation asynchronously using Ollama."""
-    # Only generate if talking is enabled AND not currently in a conversation
-    if ENABLE_TALKING == True:
-        print(f"Sim {self.sim_id}: Requesting standard thought for: {situation_description}")
-        request_sent = self.ollama_client.request_thought_generation(self.sim_id, situation_description)
-        if not request_sent:
-            print(f"Sim {self.sim_id}: Standard thought generation request ignored (already active).")

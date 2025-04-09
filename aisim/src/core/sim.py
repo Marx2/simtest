@@ -49,8 +49,6 @@ class Sim:
         self.personality_description = "Personality not set."
         load_or_generate_personality_for_sim(self, sim_config)
         self.memory = []  # List to store significant events or interactions
-        self.current_thought = None
-        self.thought_timer = 0.0
         self.relationships = {}  # Key: other_sim_id, Value: {"friendship": float, "romance": float}
         self.mood = 0.0  # -1.0 (Sad) to 1.0 (Happy)
         self.last_interaction_time = 0.0  # Time of last interaction
@@ -96,12 +94,6 @@ class Sim:
                 self.path = get_path((self.x, self.y), (target_x, target_y), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
             if not self.path:  # Still no path (e.g., couldn't find one)
                 return
-
-        # Update thought timer (for non-conversation thoughts)
-        if self.current_thought:
-            self.thought_timer -= dt
-            if self.thought_timer <= 0:
-                self.current_thought = None
 
         # --- Mood Update based on Weather ---
         if weather_state in ["Rainy", "Snowy"]:
@@ -264,7 +256,7 @@ class Sim:
            print(f"Error loading sprite sheet: {e}")
            return "Unknown_Sim", None # Return a default name if loading fails
     def draw(self, screen, dt, all_sims):
-        """Draws the Sim and its current thought on the screen."""
+        """Draws the Sim on the screen."""
         sim_pos = (int(self.x), int(self.y))
 
         # Get the sprite based on the current direction

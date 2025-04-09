@@ -1,5 +1,4 @@
 import ollama
-import json
 # import os # No longer needed for CONFIG_PATH
 import threading # Added
 import queue # Added
@@ -41,28 +40,6 @@ class OllamaClient:
         if not all(k in self.romance_analysis_prompt_template for k in ['{sim1_name}', '{sim2_name}', '{history}']):
             print("Warning: romance_analysis_prompt_template might be missing required placeholders ({sim1_name}, {sim2_name}, {history})")
 
-    # Removed _load_config method as configuration is now handled by ConfigManager
-    def _generate_worker(self, sim_id, situation_description):
-        """Worker function to run Ollama generation in a separate thread."""
-        # print(f"Ollama worker started for Sim {sim_id}") # Debug
-        prompt = self.prompt_template.format(situation=situation_description)
-        result = None
-        try:
-            response = self.client.generate(model=self.model, prompt=prompt, stream=False)
-            result = response.get('response', '').strip()
-            # print(f"Ollama worker for Sim {sim_id} got result: {result}") # Debug
-        except Exception as e:
-            print(f"Error communicating with Ollama for Sim {sim_id}: {e}")
-            result = f"({self.model} unavailable)" # Placeholder thought on error
-        finally:
-            # Put structured result onto the queue
-            result_data = {'type': 'thought', 'sim_id': sim_id, 'data': result}
-            self.results_queue.put(result_data)
-            # Mark request as completed for this sim_id
-            self.active_requests.discard(sim_id)
-            # print(f"Ollama worker finished for Sim {sim_id}. Active requests: {self.active_requests}") # Debug
-
-
     def _generate_conversation_worker(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]], personality_info: str, romance_level: float):
         """Worker function to run Ollama conversation generation in a separate thread."""
         # Format history for the prompt
@@ -98,16 +75,6 @@ class OllamaClient:
             result_data = {'type': 'conversation', 'sim_id': sim_id, 'data': result}
             self.results_queue.put(result_data)
             self.active_requests.discard(sim_id)
-
-
-    def request_thought_generation(self, sim_id: any, situation_description: str) -> bool:
-        """Requests thought generation asynchronously. Returns True if request started, False otherwise."""
-        if sim_id in self.active_requests:
-            return False
-        self.active_requests.add(sim_id)
-        thread = threading.Thread(target=self._generate_worker, args=(sim_id, situation_description), daemon=True)
-        thread.start()
-        return True
 
     def request_conversation_response(self, sim_id: any, my_name: str, other_name: str, history: List[Dict[str, str]], personality_info: str, romance_level: float) -> bool:
         """Requests a conversation response asynchronously, selecting prompt based on romance_level. Returns True if request started, False otherwise."""
@@ -173,7 +140,7 @@ class OllamaClient:
         return True # Assume thread start is successful for now
 
     def check_for_results(self) -> Optional[Dict[str, Any]]:
-        """Checks the queue for any completed results (thought, conversation, analysis). Non-blocking."""
+        """Checks the queue for any completed results (conversation, analysis). Non-blocking."""
         try:
             # Get result dictionary without blocking
             result_data = self.results_queue.get_nowait()
@@ -229,17 +196,6 @@ class OllamaClient:
         )
         thread.start()
         return True # Assume thread start is successful for now
-
-    # Keep the synchronous version for potential testing or other uses
-    def generate_thought_sync(self, situation_description):
-        """Generates a thought synchronously (original method)."""
-        prompt = self.prompt_template.format(situation=situation_description)
-        try:
-            response = self.client.generate(model=self.model, prompt=prompt, stream=False)
-            return response.get('response', '').strip()
-        except Exception as e:
-            print(f"Error communicating with Ollama (sync): {e}")
-            return f"({self.model} unavailable)"
 
     def calculate_personality_description(self, personality_data: Dict, sex: str) -> str:
         """Generates a personality description synchronously using the Ollama API."""

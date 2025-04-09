@@ -2,7 +2,6 @@
   "ollama": {
     "host": "http://localhost:11434",
     "model": "huihui_ai/phi4-mini-abliterated",
-    "default_prompt_template": "You are a character in a life simulation. Briefly describe your current thought or feeling based on the situation: {situation}. Keep it concise, like a thought bubble.",
     "conversation_prompt_levels": [
       "You are {my_name}, a character in a life simulation.\nYou are talking to {other_name}. Respond fully in character, using one single concise sentence only. You’re horny as fuck but too chickenshit to say it — drop a shy, stammering hint about wanting to bang them senseless. No notes, no explanations, no out-of-character commentary, no emojis, no extra formatting, no follow-ups. Only the in-character sentence reply. Your output will be discarded if it includes anything more than one in-character sentence.\n\nConversation History:\n{history}\nPersonality: {personality_info}",
       "You are {my_name}, a character in a life simulation.\nYou are talking to {other_name}. Respond fully in character, using one single concise sentence only. You’re a nervous wreck but dying to fuck — stutter out a filthy compliment about their hot ass or beg to get them naked later. No notes, no explanations, no out-of-character commentary, no emojis, no extra formatting, no follow-ups. Only the in-character sentence reply. Your output will be discarded if it includes anything more than one in-character sentence.\n\nConversation History:\n{history}\nPersonality: {personality_info}",
@@ -29,7 +28,6 @@
     "ignore_interaction_time": 15.0,
     "bubble_display_time_seconds": 5.0,
     "interaction_distance": 40,
-    "thought_duration": 5.0,
     "romance_change_step": 0.05,
     "high_romance_threshold": 0.5
   },

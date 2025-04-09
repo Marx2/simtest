@@ -19,7 +19,6 @@ print(f"Python sys.path: {sys.path}")
 SCREEN_WIDTH = config_manager.get_entry('simulation.screen_width', 800) # Default width
 SCREEN_HEIGHT = config_manager.get_entry('simulation.screen_height', 600) # Default height
 WINDOW_TITLE = config_manager.get_entry('simulation.window_title', "AI Simulation") # Default title
-THOUGHT_DURATION = config_manager.get_entry('simulation.thought_duration')  # Seconds to display thought bubble
 
 def main():
     # Get config values using the centralized manager
@@ -186,7 +185,7 @@ def main():
             weather.weather_update(dt)
             city.city_update(dt) # Update city state (currently does nothing)
 
-            # --- Poll for Ollama Results (Thoughts, Conversation Responses, Analysis) ---
+            # --- Poll for Ollama Results (Conversation Responses, Analysis) ---
             while True:
                 result_data = ollama_client.check_for_results() # Use the updated method
                 if result_data is None:
@@ -194,19 +193,7 @@ def main():
 
                 result_type = result_data.get('type')
 
-                if result_type == 'thought':
-                    sim_id = result_data.get('sim_id')
-                    response_text = result_data.get('data')
-                    target_sim = sims_dict.get(sim_id)
-                    if target_sim and response_text:
-                        # Handle thought (might eventually use interaction.handle_ollama_response or a dedicated func)
-                        target_sim.current_thought = response_text
-                        target_sim.thought_timer = THOUGHT_DURATION # Assuming THOUGHT_DURATION is defined/accessible
-                        print(f"Sim {sim_id} thought: {response_text}") # Debug
-                    elif not target_sim:
-                        print(f"Warning: Received 'thought' result for unknown Sim ID: {sim_id}")
-
-                elif result_type == 'conversation':
+                if result_type == 'conversation':
                     sim_id = result_data.get('sim_id')
                     response_text = result_data.get('data')
                     target_sim = sims_dict.get(sim_id)
