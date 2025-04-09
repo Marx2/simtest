@@ -6,13 +6,35 @@ from aisim.src.core.mood import get_mood_description
 
 # Font will be initialized lazily inside draw_bubble
 PANEL_FONT = None
-# PANEL_FONT_PATH = config_manager.get_entry('sim.panel_font_dir')
-PANEL_FONT_PATH = ''
+PANEL_EMOJI_FONT = None
+PANEL_FONT_PATH = config_manager.get_entry('sim.panel_font_dir')
+PANEL_EMOJI_FONT_PATH = config_manager.get_entry('sim.panel_font_emoji_dir') # Added emoji font path
 
 # Get colors from config with defaults
 TEXT_COLOR = tuple(config_manager.get_entry('ui.text_color', [240, 240, 240]))
 BG_COLOR = tuple(config_manager.get_entry('ui.bg_color', [50, 50, 50, 180]))
 
+def is_emoji(char):
+    """Returns True if the character is likely an emoji."""
+    # Using a simple codepoint range check is often sufficient and avoids
+    # dependency on unicodedata if not available or needed elsewhere.
+    # More comprehensive checks can be added if required.
+    codepoint = ord(char)
+    # Basic Multilingual Plane Supplement + Supplementary Multilingual Plane (covers many emojis)
+    is_bmp_emoji = (
+        (0x2600 <= codepoint <= 0x27BF) or  # Miscellaneous Symbols
+        (0x1F300 <= codepoint <= 0x1F5FF) or  # Misc Symbols and Pictographs
+        (0x1F600 <= codepoint <= 0x1F64F) or  # Emoticons
+        (0x1F680 <= codepoint <= 0x1F6FF) or  # Transport and Map
+        (0x1FA70 <= codepoint <= 0x1FAFF)     # Symbols and Pictographs Extended-A
+    )
+    # Check for specific characters if needed, e.g., variation selectors
+    is_variation_selector = (0xFE00 <= codepoint <= 0xFE0F)
+
+    # More complex checks involving specific ranges or properties can be added.
+    # This basic check covers a wide range of common emojis.
+    # Consider adding checks for ZWJ sequences or flags if needed later.
+    return is_bmp_emoji # Ignoring variation selectors for basic check
 def wrap_text(text, font, max_width):
     """Wraps text to fit within a specified width."""
     lines = []
@@ -89,25 +111,55 @@ def wrap_text_compact(text, font, max_width):
 
 def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_color=BG_COLOR, max_width=150, padding=10, offset_y=-30):
     """Draws a text bubble above a given position."""
-    global PANEL_FONT # Declare intent to modify the global variable
+    global PANEL_FONT, PANEL_EMOJI_FONT # Declare intent to modify the global variables
 
     # Lazy font initialization
     if font is None:
+        # Initialize regular font
         if PANEL_FONT is None:
             try:
-                # Ensure font module is initialized (should be by main.py, but check)
-                if not pygame.font.get_init():
-                    pygame.font.init()
-                           # Load the emoji-supporting font
-                if os.path.exists(PANEL_FONT_PATH):
-                    PANEL_FONT = pygame.font.Font(PANEL_FONT_PATH, 18)
+                if not pygame.font.get_init(): pygame.font.init()
+                if PANEL_FONT_PATH and os.path.exists(PANEL_FONT_PATH):
+                    PANEL_FONT = pygame.font.Font(PANEL_FONT_PATH, 14)  # Regular text at 14px
+                    print(f"Loaded panel font: {PANEL_FONT_PATH}")
                 else:
-                    PANEL_FONT = pygame.font.SysFont(None, 18)
+                    PANEL_FONT = pygame.font.SysFont(None, 14) # Fallback
+                    print(f"Panel font path not found or invalid, using SysFont: {PANEL_FONT_PATH}")
             except pygame.error as e:
-                 print(f"Error initializing default font in panel.py: {e}")
-                 # Fallback or re-raise? For now, let it fail if font init fails.
+                 print(f"Error initializing panel font '{PANEL_FONT_PATH}': {e}")
                  return # Cannot draw without a font
-        font = PANEL_FONT # Use the global default if no specific font passed
+
+        # Initialize emoji font
+        if PANEL_EMOJI_FONT is None:
+            try:
+                if not pygame.font.get_init(): pygame.font.init()
+                if PANEL_EMOJI_FONT_PATH and os.path.exists(PANEL_EMOJI_FONT_PATH):
+                    # Load emoji font - size might need adjustment based on font design
+                    # Start with same size as regular font, adjust if needed
+                    PANEL_EMOJI_FONT = pygame.font.Font(PANEL_EMOJI_FONT_PATH, 10) # Use smaller size for emoji
+                    print(f"Loaded emoji font: {PANEL_EMOJI_FONT_PATH}")
+                    # Optional: Verify emoji font can render test emojis
+                    # try:
+                    #     test_emoji = "🤔"
+                    #     test_surface = PANEL_EMOJI_FONT.render(test_emoji, True, (255,255,255))
+                    #     if test_surface.get_width() == 0 or test_surface.get_height() == 0:
+                    #          print("Warning: Emoji font failed to render test emoji.")
+                    #          # Fallback might be needed, e.g., PANEL_EMOJI_FONT = PANEL_FONT
+                    # except pygame.error:
+                    #     print("Warning: Pygame error rendering test emoji.")
+                else:
+                    # If emoji font path is not valid, fallback to the main font
+                    PANEL_EMOJI_FONT = PANEL_FONT
+                    if PANEL_EMOJI_FONT_PATH: # Only warn if a path was actually provided
+                        print(f"Emoji font path not found or invalid, using main panel font as fallback: {PANEL_EMOJI_FONT_PATH}")
+                    else:
+                        print("Emoji font path not configured, using main panel font for emojis.")
+            except pygame.error as e:
+                 print(f"Error initializing emoji font '{PANEL_EMOJI_FONT_PATH}': {e}")
+                 PANEL_EMOJI_FONT = PANEL_FONT # Fallback to main font on error
+
+        # Use the global default if no specific font passed in the function call
+        font = PANEL_FONT # Main font reference
 
     if not text or not font: # Also check if font initialization failed
         return
@@ -116,36 +168,116 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
     if not lines: # Don't draw if wrapping results in no lines
         return
 
-    # Calculate total height and max width of the text block
-    line_height = font.get_linesize()
-    total_height = len(lines) * line_height
-    try:
-        actual_max_width = max(font.size(line)[0] for line in lines)
-    except ValueError: # Handle case where lines might be empty after wrapping
+    # --- Measurement Phase ---
+    if not PANEL_FONT or not PANEL_EMOJI_FONT:
+        print("Error: Fonts not initialized, cannot draw bubble.")
         return
 
-    # Calculate bubble dimensions
-    bubble_width = actual_max_width + (2 * padding)
-    bubble_height = total_height + (2 * padding)
+    measured_lines = []
+    max_measured_width = 0
+    # Determine max line height needed considering both fonts
+    max_line_height = max(PANEL_FONT.get_linesize(), PANEL_EMOJI_FONT.get_linesize())
+    total_content_height = 0
+
+    for line_text in lines:
+        if not line_text:
+            measured_lines.append({'text': '', 'width': 0, 'height': max_line_height, 'segments': []})
+            total_content_height += max_line_height
+            continue
+
+        segments = []
+        current_segment_text = ""
+        current_is_emoji = None
+        line_width = 0
+        line_max_segment_height = 0 # Track max height within this specific line
+
+        for char in line_text:
+            char_is_emoji = is_emoji(char)
+            segment_font = PANEL_EMOJI_FONT if char_is_emoji else PANEL_FONT
+
+            if not segment_font: # Safety check if a font failed to load
+                print(f"Warning: Font not available for character '{char}'")
+                continue
+
+            if current_is_emoji is None: # First char
+                current_is_emoji = char_is_emoji
+                current_segment_text += char
+            elif char_is_emoji == current_is_emoji: # Continue segment
+                current_segment_text += char
+            else: # End previous segment
+                prev_font = PANEL_EMOJI_FONT if current_is_emoji else PANEL_FONT
+                segment_width = prev_font.size(current_segment_text)[0]
+                segment_height = prev_font.get_linesize()
+                segments.append({'text': current_segment_text, 'font': prev_font, 'width': segment_width, 'height': segment_height})
+                line_width += segment_width
+                line_max_segment_height = max(line_max_segment_height, segment_height)
+                # Start new segment
+                current_segment_text = char
+                current_is_emoji = char_is_emoji
+
+        # Add the last segment
+        if current_segment_text:
+            last_font = PANEL_EMOJI_FONT if current_is_emoji else PANEL_FONT
+            segment_width = last_font.size(current_segment_text)[0]
+            segment_height = last_font.get_linesize()
+            segments.append({'text': current_segment_text, 'font': last_font, 'width': segment_width, 'height': segment_height})
+            line_width += segment_width
+            line_max_segment_height = max(line_max_segment_height, segment_height)
+
+        # Store measured data for the line
+        measured_lines.append({'text': line_text, 'width': line_width, 'height': line_max_segment_height, 'segments': segments})
+        max_measured_width = max(max_measured_width, line_width)
+        # Use the actual max segment height for this line for total height calculation
+        total_content_height += line_max_segment_height # Use the tallest element in the line
+
+    # --- Dimension Calculation Phase ---
+    bubble_width = max_measured_width + (2 * padding)
+    bubble_height = total_content_height + (2 * padding)
     bubble_x = position[0] - bubble_width // 2
     bubble_y = position[1] + offset_y - bubble_height # Position above the target point
     screen_height = screen.get_height()
     if bubble_y < 0:
         bubble_y = 0
 
-    # Draw bubble background
-    bubble_rect = pygame.Rect(bubble_x, bubble_y, bubble_width, bubble_height)
-    # Use Surface with SRCALPHA for transparency
-    bubble_surface = pygame.Surface((bubble_width, bubble_height), pygame.SRCALPHA)
-    pygame.draw.rect(bubble_surface, bg_color, bubble_surface.get_rect(), border_radius=5)
+    # --- Render Phase ---
+    try:
+        bubble_surface = pygame.Surface((bubble_width, bubble_height), pygame.SRCALPHA)
+        bubble_surface.fill((0,0,0,0)) # Ensure transparent background
+        pygame.draw.rect(bubble_surface, bg_color, bubble_surface.get_rect(), border_radius=5)
+    except pygame.error as e:
+         print(f"Error creating bubble surface (width={bubble_width}, height={bubble_height}): {e}")
+         return # Cannot proceed if surface creation fails
 
-    # Draw each line of text onto the bubble surface
-    text_start_y = padding # Start text drawing inside the padding
-    for i, line in enumerate(lines):
-        text_surface = font.render(line, True, text_color)
-        # Center text horizontally within the bubble's padded area
-        text_rect = text_surface.get_rect(centerx=bubble_width / 2, y=text_start_y + i * line_height)
-        bubble_surface.blit(text_surface, text_rect)
+    current_y = padding
+    for line_data in measured_lines:
+        if not line_data['text']:
+             current_y += line_data['height'] # Advance Y even for empty lines
+             continue
+
+        # Center the line based on its measured width
+        start_x = (bubble_width - line_data['width']) // 2
+        start_x = max(padding, start_x) # Ensure it respects padding
+
+        current_x = start_x
+        # Use the line's specific max segment height for vertical positioning within its allocated space
+        line_render_y = current_y
+
+        for segment in line_data['segments']:
+            if not segment['font']:
+                print(f"Warning: Font missing for segment '{segment['text']}'. Skipping render.")
+                continue
+            try:
+                text_surface = segment['font'].render(segment['text'], True, text_color)
+                # Adjust vertical position slightly if fonts have different baselines (optional, complex)
+                # For now, render aligned to the top of the line's allocated height
+                bubble_surface.blit(text_surface, (current_x, line_render_y))
+                current_x += segment['width']
+            except pygame.error as e:
+                 print(f"Error rendering segment '{segment['text']}' with font {segment['font']}: {e}")
+            except AttributeError:
+                 print(f"Error: Font object invalid for segment '{segment['text']}'. Font: {segment['font']}")
+
+        current_y += line_data['height'] # Move to the next line position based on the current line's max height
 
     # Blit the complete bubble surface onto the main screen
     screen.blit(bubble_surface, (bubble_x, bubble_y))

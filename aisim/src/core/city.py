@@ -8,6 +8,8 @@ import os
 from aisim.src.core.movement import get_tile_coords, get_node_from_coords, get_coords_from_node, get_path
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 TILE_SIZE = config_manager.get_entry('city.tile_size')
+PANEL_FONT_PATH = config_manager.get_entry('sim.panel_font_dir')
+
 class City:
     """Represents the city environment."""
     def __init__(self, width, height):
@@ -145,7 +147,7 @@ class City:
         if show_debug_borders:
             try:
                 if not pygame.font.get_init(): pygame.font.init()
-                debug_font = pygame.font.SysFont(None, 14) # Small font for coordinates
+                debug_font = pygame.font.Font(PANEL_FONT_PATH, 12) # Small font for coordinates
             except Exception as e:
                 print(f"Warning: Could not initialize font for debug borders: {e}")
                 show_debug_borders = False # Disable if font fails

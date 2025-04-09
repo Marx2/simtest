@@ -12,7 +12,7 @@ from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
 from aisim.src.core.logger import Logger
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core import interaction
-from aisim.src.core.panel import draw_panel_details
+from aisim.src.core.panel import draw_panel_details, draw_bubble
 
 print(f"Current working directory: {os.getcwd()}")
 print(f"Python sys.path: {sys.path}")
@@ -36,8 +36,9 @@ def main():
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption(WINDOW_TITLE)
     clock = pygame.time.Clock()
-    ui_font = pygame.font.SysFont(None, 24) # Font for UI text
-    log_font = pygame.font.SysFont(None, 18) # Smaller font for event log
+    PANEL_FONT_PATH = config_manager.get_entry('sim.panel_font_dir')
+    ui_font = pygame.font.Font(PANEL_FONT_PATH, 18) # Font for UI text
+    log_font = pygame.font.Font(PANEL_FONT_PATH, 14) # Smaller font for event log
     # Create Simulation Components
     weather = Weather(weather_config, SCREEN_WIDTH, SCREEN_HEIGHT) # Pass weather config section
     city = City(SCREEN_WIDTH, SCREEN_HEIGHT) # City will use config_manager internally now
@@ -63,6 +64,7 @@ def main():
     last_clicked_sim_id = None
     DOUBLE_CLICK_TIME = 500 # Milliseconds
     panel_scroll_offset = 0 # Initialize scroll offset
+    show_test_bubble = False # Flag to show the test bubble
     while running:
         # Event handling
         for event in pygame.event.get():
@@ -74,6 +76,9 @@ def main():
                 elif event.key in time_scales: # Change speed
                      time_scale = time_scales[event.key]
                      print(f"Time scale set to: {time_scale}x")
+                elif event.key == pygame.K_e: # Toggle test bubble
+                     show_test_bubble = not show_test_bubble
+                     print(f"Test bubble {'enabled' if show_test_bubble else 'disabled'}")
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1: # Left click
                     mouse_x, mouse_y = event.pos
@@ -356,6 +361,15 @@ def main():
                 SCREEN_WIDTH,
                 SCREEN_HEIGHT
             )
+       
+       # --- Draw Test Bubble ---
+        # --- Draw Test Bubble ---
+        if show_test_bubble:
+            test_text = "Test Bubble! 👋🤔🎉✨ Emojis!"
+            test_pos = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2) # Center screen
+            # Call draw_bubble - it will use its internal default fonts if None passed
+            draw_bubble(screen, test_text, test_pos) # Use defaults from panel.py
+
         pygame.display.flip() # Update the full display Surface to the screen
 
 
