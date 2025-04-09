@@ -7,7 +7,7 @@ from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.city import City
 from aisim.src.core.configuration import config_manager
 # Import the functions directly from the interaction module
-from aisim.src.core.interaction import handle_ollama_response, _initiate_conversation, _send_conversation_request
+from aisim.src.core.interaction import handle_ollama_response, initiate_conversation, _send_conversation_request
 
 class TestConversation(unittest.TestCase):
 
@@ -117,7 +117,7 @@ class TestConversation(unittest.TestCase):
         sim2.is_my_turn_to_speak = False
 
         # Call initiate_conversation and send_conversation_request from interaction module
-        _initiate_conversation(sim1, sim2, city, all_sims, time.time())
+        initiate_conversation(sim1, sim2, city, all_sims, time.time())
 
         # _initiate_conversation already determines the first speaker and calls
         # _send_conversation_request internally. No need to call it again here.

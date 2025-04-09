@@ -2,7 +2,9 @@ import pygame
 import random
 import os
 from typing import List, Dict, Optional
+import logging # Add logging import
 from aisim.src.ai.ollama_client import OllamaClient
+from aisim.src.core.interaction import _send_conversation_request # Import the function
 from aisim.src.core.interaction import check_interactions, _end_interaction
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, movement_update
 from aisim.src.core.text import draw_bubble
@@ -143,36 +145,38 @@ class Sim:
              _end_interaction(self, city, all_sims) # Assumes _end_interaction is accessible
              return # Stop further processing within this method
 
-        # If it's my turn and I'm not waiting for a response, request one
+        # --- Turn-Based Speaking Logic with Lock ---
         if self.is_my_turn_to_speak and not self.waiting_for_ollama_response:
-            print(f"Sim {self.sim_id}: It's my turn to speak. conversation_turns={self.conversation_turns}, waiting_for_ollama_response={self.waiting_for_ollama_response}")
-            partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-            if partner:
-                print(f"Sim {self.sim_id}: Requesting conversation response (Turn {self.conversation_turns}). History: {self.conversation_history}")
-                # Get the romance level towards the partner
-                relationship_data = self.relationships.get(self.conversation_partner_id, {}) # Default to empty dict if no relationship entry
-                romance_level = relationship_data.get("romance", 0.0) # Default to 0.0 if 'romance' key missing
-                print(f"Sim {self.sim_id}: Romance level towards {partner.first_name} ({self.conversation_partner_id}) = {romance_level:.2f}") # Debug log
+            # print(f"Sim {self.sim_id}: My turn, attempting to speak. Lock state: {city.ollama_client_locked}")
+            # Attempt to acquire the global Ollama lock
+            if not city.ollama_client_locked:
+                city.ollama_client_locked = True # Acquire lock
+                print(f"Sim {self.sim_id}: Acquired Ollama lock. Preparing to send request.")
 
-                # Note: Using self.ollama_client requires ollama_client to be passed or accessible
-                request_sent = self.ollama_client.request_conversation_response(
-                    self.sim_id,
-                    self.first_name,
-                    partner.first_name,
-                    self.conversation_history,
-                    self.personality_description, # Pass pre-calculated description string
-                    romance_level # Pass the calculated romance level
-                )
-                if request_sent:
-                    self.waiting_for_ollama_response = True
-                    self.conversation_last_response_time = current_time # Reset timeout timer
+                partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
+                if partner:
+                    # Call the imported _send_conversation_request function
+                    # Pass self as speaker, partner as listener
+                    request_successful = _send_conversation_request(self, partner, city, all_sims, current_time)
+
+                    if not request_successful:
+                        # Request failed (Ollama client error, etc.)
+                        print(f"Sim {self.sim_id}: _send_conversation_request failed. Releasing lock.")
+                        city.ollama_client_locked = False # Release the lock
+                        # Consider ending interaction after multiple failures? For now, just log and release.
+                        # Maybe add a failure counter later.
+                        # _end_interaction(self, city, all_sims) # Don't end immediately, allow retry next cycle?
                 else:
-                    print(f"Sim {self.sim_id}: Failed to send conversation request (maybe Ollama busy?).")
-                    # Optionally handle failure, e.g., end interaction after a few failed attempts
-            else:
-                 print(f"Sim {self.sim_id}: ERROR - Conversation partner {self.conversation_partner_id} not found!")
-                 _end_interaction(self, city, all_sims) # Assumes _end_interaction is accessible
-                 return # Stop further processing within this method
+                    # Partner not found, end interaction and release lock
+                    print(f"Sim {self.sim_id}: ERROR - Conversation partner {self.conversation_partner_id} not found during turn! Ending interaction.")
+                    city.ollama_client_locked = False # Release the lock before ending
+                    _end_interaction(self, city, all_sims)
+                    return # Stop processing this conversation update
+
+            # else:
+                # Lock is busy, wait for the next cycle
+                # print(f"Sim {self.sim_id}: Waiting for Ollama lock to become available.")
+                # Do nothing this cycle, will retry on the next update
 
 
     def _find_sim_by_id(self, sim_id_to_find: any, all_sims: List['Sim']) -> Optional['Sim']:
@@ -285,52 +289,68 @@ class Sim:
             # Fallback: draw a colored circle
             pygame.draw.circle(screen, self.sim_color, sim_pos, self.sim_radius) # Use configured fallback color and radius
 
-        # Draw conversation or thought bubble using the imported function
-        bubble_text = None
-        bubble_text = None
-        is_conversation = False # Flag to track bubble type
+        # --- Bubble Display Logic ---
+        bubble_text_to_display = None
+        is_conversation = False
+        partner = None
+
+        # Find partner if interacting
+        if self.is_interacting and self.conversation_partner_id:
+            partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
+
+        # Decrement conversation timer if message exists
         if self.conversation_message:
-            # Decrement timer only when message exists
-            self.conversation_message_timer -= dt # Use delta time for consistent display
-            if self.conversation_message_timer > 0: # Check if timer still positive
-                 bubble_text = self.conversation_message
-                 is_conversation = True # It's a conversation bubble
-            else:
-                 self.conversation_message = None # Clear message after time
-                 self.conversation_message_timer = 0.0 # Reset timer
-        elif self.current_thought:
-             # Handle non-conversation thought display timer (if needed, or remove if thoughts are transient)
-             # Assuming current_thought display is handled by its own timer logic elsewhere
-             bubble_text = self.current_thought
-             # Keep is_conversation as False
+            self.conversation_message_timer -= dt
 
-        if bubble_text: # Check if timer > 0 removed as it's handled above
-            # --- Determine arguments for draw_bubble ---
+        # Determine if partner is currently displaying *their* bubble
+        partner_is_displaying = False
+        if partner and partner.conversation_message and partner.conversation_message_timer > 0:
+            partner_is_displaying = True
+
+        # --- Determine text to display ---
+        should_display_conversation = False
+        if self.conversation_message and self.conversation_message_timer > 0:
+            # Check if we *can* display the conversation bubble (partner not displaying)
+            if not partner_is_displaying:
+                bubble_text_to_display = self.conversation_message
+                is_conversation = True
+                should_display_conversation = True # Mark that we intend to display convo this frame
+            # else: partner is displaying, so we wait. bubble_text_to_display remains None for now.
+
+        # Fallback to current thought ONLY if we are NOT displaying a conversation bubble this frame
+        if not should_display_conversation and self.current_thought and self.thought_timer > 0:
+            bubble_text_to_display = self.current_thought
+            is_conversation = False # It's a thought bubble
+
+        # --- Clear Expired Conversation Bubble ---
+        # A conversation bubble is cleared simply if its timer has run out,
+        # regardless of partner state or what is being displayed this frame.
+        if self.conversation_message and self.conversation_message_timer <= 0:
+             # print(f"Sim {self.sim_id}: Clearing conversation bubble because timer expired.")
+             self.conversation_message = None
+             self.conversation_message_timer = 0.0
+             # If this was the text we were *about* to display, clear that too
+             if is_conversation and bubble_text_to_display == self.conversation_message:
+                 bubble_text_to_display = None
+
+        # --- Draw Bubble if text is available ---
+        if bubble_text_to_display:
+            # Determine arguments for draw_bubble (for romance coloring)
             sim1_arg = self
-            sim2_arg = None
-            partner = None # Initialize partner
+            sim2_arg = partner if is_conversation and partner else None # Only pass partner if it's a convo bubble
 
-            if is_conversation and self.conversation_partner_id:
-                partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-                if partner:
-                    sim2_arg = partner # Set partner as sim2 for romance check
-
-            # --- Handle Overlapping Bubbles (if still needed, based on partner found) ---
-            bubble_pos = sim_pos # Start with original position
-            if is_conversation and partner and partner.conversation_message: # Check if partner *also* has a message
+            # Simple overlap avoidance (remains basic)
+            bubble_pos = sim_pos
+            if is_conversation and partner_is_displaying: # Only adjust if partner is *actively* displaying
                 distance = self.x - partner.x
-                # Use config or a constant for bubble width if needed for overlap check
                 bubble_width_estimate = 150
                 if abs(distance) < bubble_width_estimate:
-                    # Alternate bubble position based on relative position or ID
-                    # Let's try moving *this* bubble slightly if partner is to the left
                     if partner.x < self.x:
                          bubble_pos = (sim_pos[0] + bubble_width_estimate // 4, sim_pos[1])
                     else:
                          bubble_pos = (sim_pos[0] - bubble_width_estimate // 4, sim_pos[1])
-                    # More sophisticated overlap avoidance might be needed
 
-            # --- Call draw_bubble with Sim arguments ---
-            draw_bubble(screen, bubble_text, bubble_pos, sim1=sim1_arg, sim2=sim2_arg)
+            # Call the unified draw_bubble function
+            draw_bubble(screen, bubble_text_to_display, bubble_pos, sim1=sim1_arg, sim2=sim2_arg)
 
 

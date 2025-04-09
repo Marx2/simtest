@@ -30,6 +30,7 @@ class City:
         self.sims = [] # Initialize sims list
         self.active_conversation_partners = set() # Track sims currently talking
         self.pending_romance_analysis = set() # Track (sim_id1, sim_id2) pairs awaiting analysis
+        self.ollama_client_locked = False # Global lock for Ollama client access during conversations
     def _load_tilesets(self):
         """Loads the required tileset images."""
         self.tilesets = {}
