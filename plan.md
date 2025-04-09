@@ -1,92 +1,200 @@
-# Plan: Romance Level Adjustment Based on Conversation History
+# Conversation Redesign Plan
 
-**Goal:** Analyze the conversation history between two Sims using an LLM after their interaction ends and adjust their mutual romance levels based on the analysis.
+This plan details the steps to refactor the conversation logic in the `aisim` project based on the user's requirements, including an explicit Ollama client lock, turn-based flow, and specific bubble display timing.
 
-**Core Idea:**
+**Assumptions:**
 
-1.  When a conversation finishes (in `interaction._end_interaction`), trigger an asynchronous LLM request via `OllamaClient` to analyze the conversation history.
-2.  The LLM will return a simple indicator (`INCREASE`, `DECREASE`, `NEUTRAL`).
-3.  The main simulation loop (`main.py`) will poll for these analysis results (alongside existing thought/conversation results).
-4.  Upon receiving an analysis result, the main loop will update the `relationships` dictionary for both involved Sims.
+*   The `City` class (likely in `aisim/src/core/city.py`) manages shared simulation state, including the list of active Sims and global flags.
+*   The core game loop calls `sim.update()` for each Sim.
+*   Existing functions like `_find_sim_by_id` are available.
 
-**Detailed Plan:**
+**Plan Steps:**
 
-1.  **Configuration (`aisim/config/config.json`):**
-    *   Add a new prompt template specifically for romance analysis within the `ollama` section. This prompt will instruct the LLM to analyze the provided history (`{history}`) between `{sim1_name}` and `{sim2_name}` and output only one word: `INCREASE`, `DECREASE`, or `NEUTRAL`.
-    *   Example Key: `"romance_analysis_prompt_template"`
-    *   Add a configuration value for the magnitude of the romance change, e.g., `"romance_change_step": 0.05` (within the `simulation` or `sim` section).
+**1. Introduce Global Ollama Lock:**
 
-2.  **Ollama Client (`aisim/src/ai/ollama_client.py`):**
-    *   **Result Queue:** Modify the `self.results_queue` to store structured dictionaries instead of simple tuples. This allows distinguishing different result types.
-        *   Example structure: `{'type': 'romance_analysis', 'sim1_id': id1, 'sim2_id': id2, 'data': 'INCREASE'}` or `{'type': 'thought', 'sim_id': id, 'data': text}`.
-    *   **New Worker:** Create a new asynchronous worker function `_generate_romance_analysis_worker(self, sim1_id, sim1_name, sim2_id, sim2_name, history)`:
-        *   Loads the `romance_analysis_prompt_template` from config.
-        *   Formats the prompt with the provided names and history.
-        *   Calls `self.client.generate`.
-        *   Parses the response to get `INCREASE`, `DECREASE`, or `NEUTRAL`.
-        *   Puts a structured dictionary (like the example above) onto `self.results_queue`.
-        *   Handles potential errors.
-    *   **New Request Method:** Create a new public method `request_romance_analysis(self, sim1_id, sim1_name, sim2_id, sim2_name, history)`:
-        *   Starts the `_generate_romance_analysis_worker` in a new thread.
-        *   Returns `True` if started, `False` otherwise.
-    *   **Update Result Check:** Modify `check_for_thought_results` (perhaps rename to `check_for_results`) to retrieve and return the structured dictionary from the queue.
+*   **File:** `aisim/src/core/city.py` (or equivalent central state manager)
+*   **Change:** Add a new boolean attribute:
+    ```python
+    # In City.__init__
+    self.ollama_client_locked = False
+    ```
+*   **Reset:** Ensure this flag is reset to `False` if the simulation restarts.
 
-3.  **Interaction Logic (`aisim/src/core/interaction.py`):**
-    *   Modify `_end_interaction(self, city, all_sims)`:
-        *   **Before** clearing `self.conversation_history` and `partner.conversation_history`, capture the history (e.g., `final_history = self.conversation_history[:]`).
-        *   Get the partner Sim object (`partner = self._find_sim_by_id(...)`).
-        *   Store `self.sim_id`, `self.first_name`, `partner.sim_id`, `partner.first_name`.
-        *   **After** getting the necessary data but **before** clearing the partner's state, call the new `self.ollama_client.request_romance_analysis` method with the captured IDs, names, and `final_history`, but only if `final_history` is not empty/None.
-        *   Proceed with clearing the state for both Sims as currently implemented.
+**2. Modify Conversation Initiation (`interaction.py`):**
 
-4.  **Main Loop (`aisim/src/main.py`):**
-    *   Modify the result polling loop (currently lines 187-201):
-        *   Call the updated `ollama_client.check_for_results()`.
-        *   Check the `'type'` field of the returned dictionary.
-        *   If `'type'` is `'thought'` or indicates a regular conversation response, pass it to `interaction.handle_ollama_response` as before.
-        *   **If `'type'` is `'romance_analysis'**:
-            *   Extract `sim1_id`, `sim2_id`, and `analysis_result` (`'INCREASE'`, `'DECREASE'`, `'NEUTRAL'`) from the dictionary.
-            *   Retrieve `sim1 = sims_dict.get(sim1_id)` and `sim2 = sims_dict.get(sim2_id)`.
-            *   Get the `romance_change_step` from `config_manager`.
-            *   If `sim1` and `sim2` exist:
-                *   Calculate the change amount based on `analysis_result` and `romance_change_step`.
-                *   Update `sim1.relationships[sim2_id]['romance']` (clamping between 0.0 and 1.0).
-                *   Update `sim2.relationships[sim1_id]['romance']` (clamping between 0.0 and 1.0).
-                *   Log this change (e.g., `print(f"Romance between {sim1.first_name} and {sim2.first_name} {analysis_result}d.")`).
+*   **File:** `aisim/src/core/interaction.py`
+*   **Function:** `_initiate_conversation`
+*   **Changes:**
+    *   After determining `first_speaker` and `second_speaker_listener`.
+    *   Remove the immediate setting of `is_interacting = True`.
+    *   Attempt to acquire the `city.ollama_client_locked` flag.
+    *   If lock acquired:
+        *   Set `city.ollama_client_locked = True`.
+        *   Set `is_interacting = True` for both Sims.
+        *   Stop movement (`path = None`, `target = None`, etc.).
+        *   Initialize conversation state (`conversation_history`, `partner_id`, etc.).
+        *   Set `first_speaker.is_my_turn_to_speak = True`, `second_speaker_listener.is_my_turn_to_speak = False`.
+        *   Add Sims to `city.active_conversation_partners`.
+        *   Call `_send_conversation_request` for the `first_speaker`.
+        *   If `_send_conversation_request` fails, release the lock (`city.ollama_client_locked = False`) and call `_end_interaction` for both Sims.
+    *   If lock *not* acquired:
+        *   Do nothing; the conversation cannot start this cycle. Sims remain available.
 
-**Sequence Diagram:**
+**3. Refine `_send_conversation_request` (`interaction.py`):**
+
+*   **File:** `aisim/src/core/interaction.py`
+*   **Function:** `_send_conversation_request`
+*   **Changes:**
+    *   Modify signature to accept `current_time: float` and return `bool` (success/failure).
+    *   Assume the Ollama lock is *already held* when called.
+    *   Wrap the `ollama_client.request_conversation_response` call in a `try...except`.
+    *   If the request is sent successfully (`request_conversation_response` returns true):
+        *   Set `speaker.waiting_for_ollama_response = True`.
+        *   Set `speaker.conversation_last_response_time = current_time`.
+        *   Return `True`.
+    *   If the request fails (returns `False` or raises an exception):
+        *   Log the error.
+        *   Return `False`. (The calling function is responsible for releasing the lock).
+
+**4. Modify `handle_ollama_response` (`interaction.py`):**
+
+*   **File:** `aisim/src/core/interaction.py`
+*   **Function:** `handle_ollama_response`
+*   **Changes:**
+    *   Check if `city.ollama_client_locked` is `True` and release it (`city.ollama_client_locked = False`). Log a warning if it was already `False`.
+    *   Set `self.waiting_for_ollama_response = False`.
+    *   If `self.is_interacting`:
+        *   Set `self.conversation_message = response_text`.
+        *   Set `self.conversation_message_timer = self.bubble_display_time`.
+        *   Add response to `self.conversation_history`.
+        *   Find the `partner`.
+        *   If `partner` found:
+            *   Add response to `partner.conversation_history`.
+            *   Set `partner.is_my_turn_to_speak = True`.
+        *   Set `self.is_my_turn_to_speak = False`.
+        *   Increment `self.conversation_turns`.
+        *   Check for max turns and call `_end_interaction` if reached.
+    *   Else (handle regular thought):
+        *   Set `self.current_thought = response_text`.
+        *   Set `self.thought_timer = THOUGHT_DURATION`.
+
+**5. Modify `conversation_update` (`sim.py`):**
+
+*   **File:** `aisim/src/core/sim.py`
+*   **Function:** `conversation_update`
+*   **Changes:**
+    *   Check for timeouts and max turns (existing logic).
+    *   If `self.is_my_turn_to_speak` and not `self.waiting_for_ollama_response`:
+        *   Attempt to acquire the `city.ollama_client_locked` flag.
+        *   If lock acquired (`city.ollama_client_locked = True`):
+            *   Find the `partner`.
+            *   If `partner` found:
+                *   Call `_send_conversation_request(self, partner, city, all_sims, current_time)`.
+                *   If request fails (`_send_conversation_request` returns `False`):
+                    *   Release the lock (`city.ollama_client_locked = False`).
+                    *   Log failure. Consider ending interaction after multiple failures.
+            *   If `partner` not found:
+                *   Release the lock (`city.ollama_client_locked = False`).
+                *   Call `_end_interaction`.
+        *   If lock *not* acquired:
+            *   Log that the Sim is waiting for the lock. Do nothing else this cycle.
+
+**6. Refine Bubble Display Logic (`sim.py`):**
+
+*   **File:** `aisim/src/core/sim.py`
+*   **Function:** `draw`
+*   **Changes:**
+    *   Decrement `self.conversation_message_timer` if `self.conversation_message` exists.
+    *   Find the `partner`.
+    *   Check if the `partner` is currently displaying *their* bubble (`partner.conversation_message` exists and `partner.conversation_message_timer > 0`).
+    *   Condition to clear *own* bubble (`self.conversation_message = None`):
+        *   Partner *is* displaying their bubble.
+        *   Own bubble message exists (`self.conversation_message is not None`).
+        *   Own bubble timer has expired (`self.conversation_message_timer <= 0`).
+    *   Determine `bubble_text_to_display`: Use `self.conversation_message` if it exists and timer > 0, otherwise fallback to `self.current_thought`.
+    *   If `bubble_text_to_display` is set, call `draw_bubble`.
+
+**7. State Management Review:**
+
+*   Ensure `_end_interaction` correctly resets all relevant conversation state for both Sims, including `conversation_message`, `conversation_message_timer`, and `is_interacting`.
+*   Modify `_end_interaction` to check if the Sim ending the interaction currently holds the `city.ollama_client_locked` and release it if necessary.
+
+**8. Movement Handling (Clarification):**
+
+*   **Stopping:** Handled in Step 2 (`_initiate_conversation`) by setting `path` and `target` to `None` after the lock is acquired.
+*   **Resuming:** Handled implicitly. When `_end_interaction` sets `is_interacting = False`, the main `sim_update` logic will trigger pathfinding on the next cycle if `path` is `None`.
+
+**Mermaid Diagram:**
 
 ```mermaid
 sequenceDiagram
-    participant SimA as Sim A (in interaction)
-    participant SimB as Sim B (in interaction)
-    participant Interaction as interaction.py
-    participant MainLoop as main.py
-    participant OllamaClient as ollama_client.py
-    participant LLM
+    participant SimA
+    participant SimB
+    participant City
+    participant OllamaClient
 
-    Note over SimA, SimB: Conversation ends...
-    Interaction->>Interaction: In _end_interaction(): Capture history, IDs, names
-    Interaction->>OllamaClient: request_romance_analysis(ids, names, history)
-    Interaction->>Interaction: Clear SimA & SimB state
-    OllamaClient->>+LLM: generate(prompt=romance_analysis)
-    Note over OllamaClient: Worker thread puts result dict in queue
+    Note over SimA, SimB: Proximity detected, available
 
-    loop Main Game Loop
-        MainLoop->>OllamaClient: check_for_results()
-        alt Ollama has result
-            OllamaClient-->>MainLoop: Returns result_dict
-            alt result_dict['type'] == 'romance_analysis'
-                MainLoop->>MainLoop: Find sim1, sim2 in sims_dict
-                MainLoop->>MainLoop: Get romance_change_step from config
-                MainLoop->>SimA: Update relationships[sim2_id]['romance']
-                MainLoop->>SimB: Update relationships[sim1_id]['romance']
-                MainLoop->>MainLoop: Log change
-            else result_dict['type'] == 'thought'/'conversation'
-                MainLoop->>Interaction: handle_ollama_response(sim, text, ...)
-            end
-        else No result from Ollama
-            MainLoop->>MainLoop: Continue simulation updates...
+    SimA->>City: Check interaction possibility (SimA, SimB)
+    City-->>SimA: OK
+
+    Note over SimA, SimB: Randomly choose SimA first
+
+    SimA->>City: Attempt Ollama Lock
+    alt Lock Available
+        City->>SimA: Lock Acquired (ollama_client_locked = true)
+        Note over SimA, SimB: Set is_interacting=True, stop movement, init state...
+        SimA->>OllamaClient: Request conversation response (Turn 1)
+        SimA-->>SimA: waiting_for_ollama_response = True
+        SimA-->>SimA: Start response timeout timer
+    else Lock Busy
+        City->>SimA: Lock Busy
+        Note over SimA, SimB: Cannot start conversation now. Wait.
+    end
+
+    OllamaClient-->>SimA: Receive response (Text A)
+    SimA->>City: Release Ollama Lock (ollama_client_locked = false)
+    SimA-->>SimA: waiting_for_ollama_response = False
+    SimA-->>SimA: conversation_message = Text A
+    SimA-->>SimA: Start conversation_message_timer (bubble_display_time)
+    SimA-->>SimB: Share history + Text A
+    SimA-->>SimB: is_my_turn_to_speak = True
+    SimA-->>SimA: is_my_turn_to_speak = False
+
+    Note over SimA: Draw bubble A (timer > 0)
+
+    loop Update Cycles
+        alt SimB's turn & NOT waiting & Lock Available
+            SimB->>City: Attempt Ollama Lock
+            City->>SimB: Lock Acquired (ollama_client_locked = true)
+            SimB->>OllamaClient: Request conversation response (Turn 2)
+            SimB-->>SimB: waiting_for_ollama_response = True
+            SimB-->>SimB: Start response timeout timer
+            break Loop
+        else SimB's turn & Lock Busy
+             Note over SimB: Wait for lock...
+        else Not SimB's turn OR Already Waiting
+             Note over SimB: Do nothing this cycle...
         end
     end
-    LLM->>-OllamaClient: Returns analysis text
+
+    OllamaClient-->>SimB: Receive response (Text B)
+    SimB->>City: Release Ollama Lock (ollama_client_locked = false)
+    SimB-->>SimB: waiting_for_ollama_response = False
+    SimB-->>SimB: conversation_message = Text B
+    SimB-->>SimB: Start conversation_message_timer (bubble_display_time)
+    SimB-->>SimA: Share history + Text B
+    SimB-->>SimA: is_my_turn_to_speak = True
+    SimB-->>SimB: is_my_turn_to_speak = False
+
+    Note over SimA: Draw Check: SimA bubble timer running? SimB now has message?
+    alt SimA timer <= 0 AND SimB has message
+        SimA-->>SimA: conversation_message = None (Hide bubble A)
+        Note over SimA: Stop drawing bubble A
+    else
+        Note over SimA: Continue drawing bubble A
+    end
+
+    Note over SimB: Draw bubble B (timer > 0)
+
+    Note over SimA, SimB: Process continues until max turns or timeout...
