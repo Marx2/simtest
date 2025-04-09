@@ -320,21 +320,6 @@ def main():
             id_surface = log_font.render(id_text, True, (255, 255, 255))
             screen.blit(id_surface, (log_x, info_y_pos))
 
-            # Display last 5 memory entries below the ID text
-            if selected_sim.memory:
-                current_log_y = log_y # Start drawing logs from the bottom-most line
-                for entry in selected_sim.memory[-5:]: # Get last 5 entries
-                    entry_text = ""
-                    if entry['type'] == 'thought':
-                            entry_text = f"[Thought] {entry['content'][:60]}..." # Truncate long thoughts
-                    elif entry['type'] == 'interaction':
-                            entry_text = f"[Interact] w/ {entry['with_sim_id'][:6]} (F_chg: {entry['friendship_change']:.2f})"
-
-                    if entry_text: # Only render if there's text
-                        log_surface = log_font.render(entry_text, True, (200, 200, 200))
-                        screen.blit(log_surface, (log_x, current_log_y))
-                        current_log_y -= 15 # Move up for next line
-
         elif selected_tile_info:
             # --- Display Clicked Tile Info ---
             coords = selected_tile_info['coords']
