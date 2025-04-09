@@ -1,6 +1,5 @@
 import pygame
 import networkx as nx
-import math
 import random
 import os
 # import json # No longer needed as we use config_manager

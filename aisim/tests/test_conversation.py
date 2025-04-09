@@ -105,10 +105,6 @@ class TestConversation(unittest.TestCase):
         city = City(800, 600)
 
         # Set up interaction (Note: _initiate_conversation will set these)
-        # sim1.is_interacting = True # Redundant
-        # sim2.is_interacting = True # Redundant
-        # sim1.conversation_partner_id = "sim2" # Redundant
-        # sim2.conversation_partner_id = "sim1" # Redundant
         all_sims = [sim1, sim2]
         # Let sim1 speak first in this test scenario
         sim1.is_my_turn_to_speak = True
@@ -116,9 +112,6 @@ class TestConversation(unittest.TestCase):
 
         # Call initiate_conversation and send_conversation_request from interaction module
         initiate_conversation(sim1, sim2, city, all_sims, time.time())
-
-        # _initiate_conversation already determines the first speaker and calls
-        # _send_conversation_request internally. No need to call it again here.
 
         # Determine who the first speaker was for assertion purposes later
         if sim1.is_my_turn_to_speak:

@@ -2,7 +2,6 @@ import pygame
 import random
 import os
 from typing import List, Dict, Optional
-import logging # Add logging import
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import _send_conversation_request # Import the function
 from aisim.src.core.interaction import check_interactions, _end_interaction

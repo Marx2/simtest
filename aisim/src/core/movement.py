@@ -1,7 +1,6 @@
 import networkx as nx
 import math
 import random
-import os
 from aisim.src.core.sim import check_interactions
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
