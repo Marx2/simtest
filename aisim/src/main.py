@@ -9,7 +9,6 @@ from aisim.src.core.configuration import config_manager # Import the centralized
 from aisim.src.core.sim import Sim # Import Sim class (constants are now internal or loaded from config)
 from aisim.src.core.weather import Weather
 from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
-from aisim.src.core.logger import Logger
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core import interaction
 from aisim.src.core.panel import draw_panel_details
@@ -48,7 +47,6 @@ def main():
 
     # Add sims to city
     city.sims = list(sims_dict.values()) # City might still expect a list
-    logger = Logger() # Create logger instance
 
     running = True
     paused = False
@@ -184,7 +182,7 @@ def main():
             all_sims_list = list(sims_dict.values()) # Get list for passing to update
             for sim in all_sims_list:
                 # Pass city.TILE_SIZE to sim.update for arrival checks
-                sim.sim_update(dt, city, weather.current_state, all_sims_list, logger, current_sim_time, TILE_SIZE, movement_direction_change_frequency) # Use retrieved frequency
+                sim.sim_update(dt, city, weather.current_state, all_sims_list, current_sim_time, TILE_SIZE, movement_direction_change_frequency) # Use retrieved frequency
             weather.weather_update(dt)
             city.city_update(dt) # Update city state (currently does nothing)
 
@@ -358,7 +356,6 @@ def main():
 
 
     # --- End of main loop ---
-    logger.close() # Close log files cleanly
     pygame.quit()
     sys.exit()
 

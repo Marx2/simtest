@@ -12,13 +12,10 @@ THOUGHT_DURATION = config_manager.get_entry('simulation.thought_duration')  # Se
 ENABLE_TALKING = config_manager.get_entry('simulation.enable_talking', False)
 BUBBLE_DISPLAY_TIME = config_manager.get_entry('simulation.bubble_display_time_seconds', 5.0)
 
-def check_interactions(self, all_sims, logger, current_time, city): # Add city parameter
+def check_interactions(self, all_sims, current_time, city): # Add city parameter
     """Checks for and handles interactions with nearby Sims, logging them."""
     INTERACTION_COOLDOWN = 1.0  # Minimum time between interactions (seconds)
     ignore_interaction_time = config_manager.get_entry('simulation.ignore_interaction_time', 5.0)
-    # if logger:
-    #     print(f"Sim {self.sim_id} checking interactions, enable_talking={self.enable_talking}, is_interacting={self.is_interacting}")
-    # print(f"Sim {self.sim_id}: Checking interactions, is_interacting={self.is_interacting}")
     for other_sim in all_sims:
         if other_sim.sim_id == self.sim_id:
             continue  # Don't interact with self
@@ -79,9 +76,6 @@ def check_interactions(self, all_sims, logger, current_time, city): # Add city p
         self.memory.append(interaction_event)
         other_sim.memory.append({"type": "interaction", "with_sim_id": self.sim_id, "friendship_change": friendship_increase})
 
-        # Log interaction
-        if logger:
-            logger.log_interaction(current_time, self.sim_id, other_sim.sim_id, friendship_increase)
         # Mood boost from positive interaction
         self.mood = min(1.0, self.mood + 0.05)
         other_sim.mood = min(1.0, other_sim.mood + 0.05)

@@ -63,7 +63,7 @@ def get_path(start_coords, end_coords, graph, get_node_from_coords, get_coords_f
         print(f"Node not found for path calculation: start={start_node}, end={end_node}, error={e}")
         return None
 
-def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time, tile_size, direction_change_frequency):
+def movement_update(sim, dt, city, weather_state, all_sims, current_time, tile_size, direction_change_frequency):
     """Updates the Sim's state, following a path if available, checks for collisions, and logs data."""
     sim.is_blocked = False # Reset blocked status at the start of movement update
 
@@ -81,9 +81,6 @@ def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time
     # If interacting, no further movement logic is needed, but tile is updated
     if hasattr(sim, 'is_interacting') and sim.is_interacting:
         return
-    # if logger:
-        # print(f"Sim {sim.sim_id} update: x={sim.x:.2f}, y={sim.y:.2f}, target={sim.target}")
-    # Coordinates are already clamped above before tile calculation
 
     # Only assign a new path if not interacting and no path exists
     if not sim.path and not sim.is_interacting:
@@ -219,16 +216,10 @@ def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time
          sim.mood = min(1.0, sim.mood + 0.003 * dt) # Slowly increase mood in good weather
 
     # --- Interaction Check ---
-    # Pass the city object to check_interactions
-    # check_interactions(sim, all_sims, logger, current_time, city)
     # Clamp mood
     sim.mood = max(-1.0, min(sim.mood, 1.0))
 
     # Current tile is now updated at the beginning of the function
-
-    # --- Log Mood ---
-    if logger:
-        logger.log_mood(current_time, sim.sim_id, sim.mood)
 
 def change_direction(sim, city, direction_change_frequency):
     """Changes the Sim's direction."""
