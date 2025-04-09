@@ -10,6 +10,7 @@ __all__ = ['check_interactions', '_end_interaction'] # Explicitly export functio
 INTERACTION_DISTANCE = config_manager.get_entry('simulation.interaction_distance')  # Max distance for interaction (pixels)
 THOUGHT_DURATION = config_manager.get_entry('simulation.thought_duration')  # Seconds to display thought bubble
 ENABLE_TALKING = config_manager.get_entry('simulation.enable_talking', False)
+BUBBLE_DISPLAY_TIME = config_manager.get_entry('simulation.bubble_display_time_seconds', 5.0)
 
 def check_interactions(self, all_sims, logger, current_time, city): # Add city parameter
     """Checks for and handles interactions with nearby Sims, logging them."""
@@ -31,8 +32,13 @@ def check_interactions(self, all_sims, logger, current_time, city): # Add city p
         # --- Interaction Start Condition ---
         can_interact_self = not self.is_interacting and (current_time - self.last_interaction_time > ignore_interaction_time)
         can_interact_other = not other_sim.is_interacting and (current_time - other_sim.last_interaction_time > ignore_interaction_time)
+        # Initialize relationship if first meeting
+        if other_sim.sim_id not in self.relationships:
+            self.relationships[other_sim.sim_id] = {"friendship": 0.0, "romance": 0.0}
+        if self.sim_id not in other_sim.relationships:
+            other_sim.relationships[self.sim_id] = {"friendship": 0.0, "romance": 0.0}
 
-        if dist < INTERACTION_DISTANCE and can_interact_self and can_interact_other:
+        if dist < INTERACTION_DISTANCE and can_interact_self and can_interact_other and not is_interaction_in_progress(self, all_sims):
             # --- Potential Interaction Start ---
             # Don't stop movement or set is_interacting yet.
             # Check if a conversation is possible first.
@@ -54,29 +60,21 @@ def check_interactions(self, all_sims, logger, current_time, city): # Add city p
             # --- Initialize Conversation ---
             if ENABLE_TALKING == True:
                 initiate_conversation(self, other_sim, city, all_sims, current_time)
-
             else:
                  self.conversation_history = None
                  other_sim.conversation_history = None
             
-
         # TODO: Use personality traits to influence interaction chance/outcome
-
-        # Initialize relationship if first meeting
-        if other_sim.sim_id not in self.relationships:
-            self.relationships[other_sim.sim_id] = {"friendship": 0.0, "romance": 0.0}
-        if self.sim_id not in other_sim.relationships:
-            other_sim.relationships[self.sim_id] = {"friendship": 0.0, "romance": 0.0}
-
-        # Basic interaction effect: slightly increase friendship
-        friendship_increase = 0.01  # Placeholder
-        self.relationships[other_sim.sim_id]["friendship"] = min(1.0, self.relationships[other_sim.sim_id]["friendship"] + friendship_increase)
-        other_sim.relationships[self.sim_id]["friendship"] = min(1.0, other_sim.relationships[self.sim_id]["friendship"] + friendship_increase)
 
         # --- Post-Interaction Start Logic (Relationship, Memory, Logging) ---
         # This part runs regardless of whether a conversation was started,
         # as long as the interaction condition was met.
         # Store interaction in memory
+        # Basic interaction effect: slightly increase friendship
+        friendship_increase = 0.01  # Placeholder
+        self.relationships[other_sim.sim_id]["friendship"] = min(1.0, self.relationships[other_sim.sim_id]["friendship"] + friendship_increase)
+        other_sim.relationships[self.sim_id]["friendship"] = min(1.0, other_sim.relationships[self.sim_id]["friendship"] + friendship_increase)
+
         interaction_event = {"type": "interaction", "with_sim_id": other_sim.sim_id, "friendship_change": friendship_increase}
         self.memory.append(interaction_event)
         other_sim.memory.append({"type": "interaction", "with_sim_id": self.sim_id, "friendship_change": friendship_increase})
@@ -87,6 +85,15 @@ def check_interactions(self, all_sims, logger, current_time, city): # Add city p
         # Mood boost from positive interaction
         self.mood = min(1.0, self.mood + 0.05)
         other_sim.mood = min(1.0, other_sim.mood + 0.05)
+
+def is_interaction_in_progress(sim1, all_sims):
+    """Checks if any Sims are currently interacting. Exclude sim1 and his partner."""
+    for sim in all_sims:
+        if sim.sim_id == sim1.sim_id or sim.sim_id == sim1.conversation_partner_id:
+            continue
+        if sim.is_interacting:
+            return True
+    return False
 
 def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
     """Cleans up state at the end of an interaction, releasing the Ollama lock if held."""
@@ -128,11 +135,6 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
             partner.waiting_for_ollama_response = False
             partner.conversation_partner_id = None
             partner.conversation_turns = 0
-            partner.interaction_timer = 0.0
-            # Remove partner from active conversations list (compatibility)
-            if partner.sim_id in city.active_conversation_partners:
-                city.active_conversation_partners.remove(partner.sim_id)
-                # print(f"Sim {partner.sim_id} removed from active conversations.")
 
     # --- Reset Self State ---
     self.is_interacting = False
@@ -144,12 +146,6 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
     self.waiting_for_ollama_response = False
     self.conversation_partner_id = None
     self.conversation_turns = 0
-    self.interaction_timer = 0.0 # Reset interaction timer
-
-    # Remove self from active conversations list (compatibility)
-    if self.sim_id in city.active_conversation_partners:
-        city.active_conversation_partners.remove(self.sim_id)
-        # print(f"Sim {self.sim_id} removed from active conversations.")
 
     # --- Trigger Romance Analysis ---
     if final_history and sim2_id is not None: # Only analyze if there was history and a valid partner
@@ -192,7 +188,6 @@ def handle_ollama_response(self, response_text: str, current_time: float, all_si
     if self.is_interacting and self.conversation_partner_id is not None:
         # --- Handle Conversation Response ---
         self.conversation_message = response_text
-        self.conversation_message_timer = self.bubble_display_time # Start bubble timer
 
         # Add to history
         new_entry = {"speaker": self.first_name, "line": response_text}
@@ -204,7 +199,7 @@ def handle_ollama_response(self, response_text: str, current_time: float, all_si
         if partner:
             if partner.conversation_history is None: partner.conversation_history = []
             partner.conversation_history.append(new_entry) # Share history
-            partner.is_my_turn_to_speak = True # It's partner's turn now
+            # partner.is_my_turn_to_speak = True # It's partner's turn now
             partner.waiting_for_ollama_response = False # Partner isn't waiting yet (will wait on their update cycle)
             # partner.conversation_last_response_time = current_time # Don't reset partner's timer here
             print(f"Sim {self.sim_id}: Passed turn to {partner.sim_id}")
@@ -213,7 +208,7 @@ def handle_ollama_response(self, response_text: str, current_time: float, all_si
             _end_interaction(self, city, all_sims) # End interaction if partner vanished
 
         # Update self state *after* processing partner
-        self.is_my_turn_to_speak = False # Not my turn anymore
+        # self.is_my_turn_to_speak = False # Not my turn anymore
         self.conversation_turns += 1 # Increment turn counter *after* successfully speaking
         # self.conversation_last_response_time = current_time # Don't reset self timer here, used for timeout *before* speaking
 
@@ -240,9 +235,8 @@ def handle_ollama_response(self, response_text: str, current_time: float, all_si
 
 def initiate_conversation(initiator_sim, other_sim, city, all_sims, current_time):
     """Handles the conversation initiation logic between two Sims, respecting the Ollama lock."""
-    # Global Conversation Lock Check (existing based on active_conversation_partners)
-    if initiator_sim.sim_id in city.active_conversation_partners or other_sim.sim_id in city.active_conversation_partners:
-        # Already involved in another conversation tracked by the old mechanism
+    # Global Conversation Lock Check
+    if is_interaction_in_progress(initiator_sim, all_sims):
         return
 
     # Pending Romance Analysis Lock Check (Existing)
@@ -276,14 +270,8 @@ def initiate_conversation(initiator_sim, other_sim, city, all_sims, current_time
         # Set interaction state for both sims
         first_speaker.is_interacting = True
         second_speaker_listener.is_interacting = True
-        first_speaker.interaction_timer = 0.0
-        second_speaker_listener.interaction_timer = 0.0
         first_speaker.last_interaction_time = current_time # Update interaction time
         second_speaker_listener.last_interaction_time = current_time
-
-        # Add to active conversation partners list (for compatibility/other checks)
-        city.active_conversation_partners.add(first_speaker.sim_id)
-        city.active_conversation_partners.add(second_speaker_listener.sim_id)
 
         # Initialize conversation details
         first_speaker.conversation_history = []

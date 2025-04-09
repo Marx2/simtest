@@ -26,7 +26,6 @@ def main():
     # Get config values using the centralized manager
     fps = config_manager.get_entry('simulation.fps', 60)
     initial_sims = config_manager.get_entry('simulation.initial_sims', 10)
-    bubble_display_time = config_manager.get_entry('simulation.bubble_display_time_seconds', 5.0)
     sim_creation_config = config_manager.get_entry('sim', {}) # Pass the whole 'sim' section if Sim expects it
     movement_direction_change_frequency = config_manager.get_entry('movement.direction_change_frequency', 5.0)
     pygame.init() # Pygame init needs to happen before font loading in Sim
@@ -45,7 +44,7 @@ def main():
 
     # Store sims in a dictionary for easy lookup by ID
     sims_dict = {}
-    sims_dict = initialize_sims(initial_sims, sims_dict, ollama_client, sim_creation_config, bubble_display_time, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE)
+    sims_dict = initialize_sims(initial_sims, sims_dict, ollama_client, sim_creation_config, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE)
 
     # Add sims to city
     city.sims = list(sims_dict.values()) # City might still expect a list
@@ -173,6 +172,7 @@ def main():
         raw_dt = clock.tick(fps) / 1000.0 # Get raw delta time
 
         # Apply time controls
+        # dt is the time passed since the last frame (the smallest time unit) scaled by time_scale 
         if paused:
             dt = 0.0 # No time passes if paused
         else:
@@ -362,7 +362,7 @@ def main():
     pygame.quit()
     sys.exit()
 
-def initialize_sims(initial_sims, sims_dict, ollama_client, sim_creation_config, bubble_display_time, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE):
+def initialize_sims(initial_sims, sims_dict, ollama_client, sim_creation_config, SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE):
     for _ in range(initial_sims): # Use retrieved initial_sims
         new_sim = Sim(
             sim_id=str(uuid.uuid4()),  # Generate unique ID
@@ -370,7 +370,6 @@ def initialize_sims(initial_sims, sims_dict, ollama_client, sim_creation_config,
             y=max(0, min(random.randint(0, SCREEN_HEIGHT), SCREEN_HEIGHT - TILE_SIZE - 1)),
             ollama_client=ollama_client, # Pass the client instance
             sim_config=sim_creation_config, # Pass the retrieved sim config dictionary
-            bubble_display_time=bubble_display_time # Pass retrieved bubble_display_time
         )
         sims_dict[new_sim.sim_id] = new_sim
     return sims_dict

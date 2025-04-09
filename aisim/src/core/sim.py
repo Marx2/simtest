@@ -12,16 +12,17 @@ from aisim.src.core.personality import _assign_sex, load_or_generate_personality
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
 TILE_SIZE = config_manager.get_entry('city.tile_size', 32) # Add default value
+BUBBLE_DISPLAY_TIME = config_manager.get_entry('simulation.bubble_display_time_seconds', 5.0)
+
 # Initialize font - needs pygame.init() - Ensure font module is initialized
 pygame.font.init()
 class Sim:
     """Represents a single Sim in the simulation."""
 
-    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, sim_config: Dict, bubble_display_time: float = 5.0):
+    def __init__(self, sim_id, x, y, ollama_client: OllamaClient, sim_config: Dict):
         """Initializes a Sim with ID, position, Ollama client, config, and bubble display time."""
         self.sim_id = sim_id  # Store the unique ID
         self.is_interacting = False
-        self.interaction_timer = 0.0
         self.talking_with = None # sim_id of the sim they are talking to
         self.sprite_sheet = None
         self.character_name, self.sprite_sheet = self._load_sprite_sheet()
@@ -65,7 +66,6 @@ class Sim:
         self.conversation_partner_id: Optional[any] = None # Store partner ID
         self.conversation_turns: int = 0
         self.conversation_last_response_time: float = 0.0
-        self.bubble_display_time: float = bubble_display_time # Store configured bubble time
         self.conversation_message: Optional[str] = None # Separate attribute for conversation text
         self.conversation_message_timer: float = 0.0 # Timer for conversation bubble
     
@@ -80,7 +80,6 @@ class Sim:
         if hasattr(self, 'last_update_time') and self.last_update_time == current_time:
             return
         self.last_update_time = current_time
-        # print(f"Sim {self.sim_id}: update called at start, is_interacting={self.is_interacting}, interaction_timer={self.interaction_timer}, path={self.path}, target={self.target}, is_interacting={self.is_interacting}")
         # --- Conversation Logic ---
         if self.is_interacting:
             # Handle conversation updates in a separate method
@@ -124,8 +123,6 @@ class Sim:
     def conversation_update(self, dt, city, all_sims: List['Sim'], current_time):
         """Handles the logic for ongoing conversations."""
         # This method assumes self.is_interacting is True when called
-
-        self.interaction_timer += dt # Keep track of total interaction time if needed
 
         # Check for conversation timeout (if waiting too long for a response)
         # Note: Using self.ollama_client requires ollama_client to be passed or accessible
@@ -286,69 +283,36 @@ class Sim:
             pygame.draw.circle(screen, self.sim_color, sim_pos, self.sim_radius) # Use configured fallback color and radius
 
         # # --- Bubble Display Logic ---
-        bubble_text_to_display = None
-        is_conversation = False
-        partner = None
-
         # Find partner if interacting
-        if self.is_interacting and self.conversation_partner_id:
-            partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-        print(f"Sim {self.sim_id}: Partner found: {partner}")
+        if self.is_interacting:
+            print(f"sim: {self.sim_id}, self.conversation_message_timer: {self.conversation_message_timer}, dt: {dt}, is_my_turn_to_speak: {self.is_my_turn_to_speak}, waiting_for_ollama_response: {self.waiting_for_ollama_response}")
+            # set partner if not set yet
+            if self.conversation_partner_id:
+                partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
+            else:
+                partner = None
+            # count down only if I have message to display
+            if self.conversation_message and self.is_my_turn_to_speak:
+                if self.conversation_message_timer <= 0:
+                    # Reset conversation message and timer
+                    self.conversation_message = None
+                    bubble_text_to_display = None
+                    self.is_my_turn_to_speak = False
+                    partner.is_my_turn_to_speak = True # Set partner's turn to speak
+                    partner.conversation_message_timer = BUBBLE_DISPLAY_TIME # Start bubble timer
+                else:
+                    # continue with existing message until timer passes
+                    bubble_text_to_display = self.conversation_message
+                    # Decrement conversation timer
+                    self.conversation_message_timer -= dt
+            else:
+                # No message to display, set to None
+                bubble_text_to_display = None
 
-        # Decrement conversation timer if message exists
-        if self.conversation_message:
-            self.conversation_message_timer -= dt
-
-        # Determine if partner is currently displaying *their* bubble
-        partner_is_displaying = False
-        if partner and partner.conversation_message and partner.conversation_message_timer > 0:
-            partner_is_displaying = True
-
-        # --- Determine text to display ---
-        should_display_conversation = False
-        if self.conversation_message and self.conversation_message_timer > 0:
-            # Check if we *can* display the conversation bubble (partner not displaying)
-            if not partner_is_displaying:
-                bubble_text_to_display = self.conversation_message
-                is_conversation = True
-                should_display_conversation = True # Mark that we intend to display convo this frame
-            # else: partner is displaying, so we wait. bubble_text_to_display remains None for now.
-
-        # Fallback to current thought ONLY if we are NOT displaying a conversation bubble this frame
-        if not should_display_conversation and self.current_thought and self.thought_timer > 0:
-            bubble_text_to_display = self.current_thought
-            is_conversation = False # It's a thought bubble
-
-        # --- Clear Expired Conversation Bubble ---
-        # A conversation bubble is cleared simply if its timer has run out,
-        # regardless of partner state or what is being displayed this frame.
-        if self.conversation_message and self.conversation_message_timer <= 0:
-             # print(f"Sim {self.sim_id}: Clearing conversation bubble because timer expired.")
-             self.conversation_message = None
-             self.conversation_message_timer = 0.0
-             # If this was the text we were *about* to display, clear that too
-             if is_conversation and bubble_text_to_display == self.conversation_message:
-                 bubble_text_to_display = None
-
-        # --- Draw Bubble if text is available ---
-        print(f"SIM {self.character_name} Drawing bubble: {bubble_text_to_display == True}")
-        if bubble_text_to_display:
-            # Determine arguments for draw_bubble (for romance coloring)
-            sim1_arg = self
-            sim2_arg = partner if is_conversation and partner else None # Only pass partner if it's a convo bubble
-
-            # Simple overlap avoidance (remains basic)
-            bubble_pos = sim_pos
-            if is_conversation and partner_is_displaying: # Only adjust if partner is *actively* displaying
-                distance = self.x - partner.x
-                bubble_width_estimate = 150
-                if abs(distance) < bubble_width_estimate:
-                    if partner.x < self.x:
-                         bubble_pos = (sim_pos[0] + bubble_width_estimate // 4, sim_pos[1])
-                    else:
-                         bubble_pos = (sim_pos[0] - bubble_width_estimate // 4, sim_pos[1])
-
-            # Call the unified draw_bubble function
-            draw_bubble(screen, bubble_text_to_display, bubble_pos, sim1=sim1_arg, sim2=sim2_arg)
+            # --- Draw Bubble if text is available ---
+            # print(f"SIM {self.character_name} Drawing bubble: {bubble_text_to_display == True}")
+            if bubble_text_to_display:
+                # Call the unified draw_bubble function
+                draw_bubble(screen, bubble_text_to_display, sim_pos, sim1=self, sim2=partner)
 
 

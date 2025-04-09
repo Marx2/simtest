@@ -27,7 +27,7 @@
     "enable_talking": true,
     "weather_transition_time": 15.0,
     "ignore_interaction_time": 15.0,
-    "bubble_display_time_seconds": 15.0,
+    "bubble_display_time_seconds": 5.0,
     "interaction_distance": 40,
     "thought_duration": 5.0,
     "romance_change_step": 0.05,

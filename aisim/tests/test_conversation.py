@@ -55,7 +55,6 @@ class TestConversation(unittest.TestCase):
 
         # Create City instance
         city = City(800, 600)
-        city.active_conversation_partners = set()
 
         # Set up interaction
         sim1.is_interacting = True
@@ -104,7 +103,6 @@ class TestConversation(unittest.TestCase):
 
         # Create City instance
         city = City(800, 600)
-        city.active_conversation_partners = set()
 
         # Set up interaction (Note: _initiate_conversation will set these)
         # sim1.is_interacting = True # Redundant

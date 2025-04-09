@@ -81,7 +81,6 @@ def movement_update(sim, dt, city, weather_state, all_sims, logger, current_time
 
     # If interacting, no further movement logic is needed, but tile is updated
     if hasattr(sim, 'is_interacting') and sim.is_interacting:
-        # print(f"Sim {sim.sim_id}: movement update skipped (after tile update) due to is_interacting=True, interaction_timer={sim.interaction_timer}")
         return
     # if logger:
         # print(f"Sim {sim.sim_id} update: x={sim.x:.2f}, y={sim.y:.2f}, target={sim.target}")
