@@ -14,7 +14,6 @@ MAX_TOTAL_TURNS = config_manager.get_entry('ollama.conversation_max_turns', 4)
 
 def check_interactions(self, all_sims, current_time, city): # Add city parameter
     """Checks for and handles interactions with nearby Sims"""
-    INTERACTION_COOLDOWN = 1.0  # Minimum time between interactions (seconds)
     ignore_interaction_time = config_manager.get_entry('simulation.ignore_interaction_time', 5.0)
     for other_sim in all_sims:
         if other_sim.sim_id == self.sim_id:
@@ -24,7 +23,6 @@ def check_interactions(self, all_sims, current_time, city): # Add city parameter
         dist = math.dist((self.x, self.y), (other_sim.x, other_sim.y))
         # print(f"Sim {self.sim_id}: current_time={current_time}, last_interaction_time={self.last_interaction_time}")
         # print(f"Sim {self.sim_id}: distance to Sim {other_sim.sim_id} = {dist}")
-        # print(f"Sim in distance: {(dist < INTERACTION_DISTANCE)}, time: {(current_time - self.last_interaction_time)}, >= {INTERACTION_COOLDOWN}")
 
         # --- Interaction Start Condition ---
         can_interact_self = not self.is_interacting and (current_time - self.last_interaction_time > ignore_interaction_time)

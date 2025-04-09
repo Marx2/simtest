@@ -12,7 +12,7 @@ from aisim.src.core.configuration import config_manager # Import the centralized
 
 TILE_SIZE = config_manager.get_entry('city.tile_size', 32) # Add default value
 BUBBLE_DISPLAY_TIME = config_manager.get_entry('simulation.bubble_display_time_seconds', 5.0)
-
+CONVERSATION_MAX_TURNS = config_manager.get_entry('ollama.conversation_max_turns', 6)
 # Initialize font - needs pygame.init() - Ensure font module is initialized
 pygame.font.init()
 class Sim:
@@ -80,7 +80,7 @@ class Sim:
         # --- Conversation Logic ---
         if self.is_interacting:
             # Handle conversation updates in a separate method
-            self.conversation_update(dt, city, all_sims, current_time)
+            self.conversation_update(city, all_sims, current_time)
             # If the conversation ended within update_conversation, is_interacting might be False now.
             # We might need to return early if _end_interaction was called inside update_conversation.
             # Let's check if the sim is still interacting after the call.
@@ -108,7 +108,7 @@ class Sim:
         # Clamp mood
         self.mood = max(-1.0, min(self.mood, 1.0))
 
-    def conversation_update(self, dt, city, all_sims: List['Sim'], current_time):
+    def conversation_update(self, city, all_sims: List['Sim'], current_time):
         """Handles the logic for ongoing conversations."""
         # This method assumes self.is_interacting is True when called
 
@@ -121,7 +121,7 @@ class Sim:
 
         # Check for max turns reached
         # Note: Using self.ollama_client requires ollama_client to be passed or accessible
-        if self.conversation_turns >= config_manager.get_entry('ollama.conversation_max_turns', 6):
+        if self.conversation_turns >= CONVERSATION_MAX_TURNS:
              print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns.")
              _end_interaction(self, city, all_sims) # Assumes _end_interaction is accessible
              return # Stop further processing within this method
@@ -132,7 +132,7 @@ class Sim:
             # Attempt to acquire the global Ollama lock
             if not city.ollama_client_locked:
                 city.ollama_client_locked = True # Acquire lock
-                print(f"Sim {self.sim_id}: Acquired Ollama lock. Preparing to send request.")
+                print(f"Sim {self.sim_id}: Acquired Ollama lock. Preparing to send request. Turn: {self.conversation_turns}")
 
                 partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
                 if partner:
