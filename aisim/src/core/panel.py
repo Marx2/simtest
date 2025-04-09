@@ -236,11 +236,11 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
                             scale_factor = target_emoji_height / original_height
                             scaled_width = int(original_width * scale_factor)
                             scaled_height = target_emoji_height # Set to target
-                            print(f"    Scaling emoji segment '{current_segment_text}' from H:{original_height} to H:{scaled_height} (Factor: {scale_factor:.2f})")
+                            # print(f"    Scaling emoji segment '{current_segment_text}' from H:{original_height} to H:{scaled_height} (Factor: {scale_factor:.2f})")
                             # Note: Scaling done during render phase to save memory unless surfaces stored
 
                         # DEBUG PRINT: Print measured segment dimensions (before potential scaling)
-                        print(f"  [Measure] Segment: '{current_segment_text}', Original W: {original_width}, H: {original_height} -> Used W: {scaled_width}, H: {scaled_height}")
+                        # print(f"  [Measure] Segment: '{current_segment_text}', Original W: {original_width}, H: {original_height} -> Used W: {scaled_width}, H: {scaled_height}")
 
                         # Store dimensions (potentially scaled) for layout
                         segments.append({
@@ -281,11 +281,11 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
                         scale_factor = target_emoji_height / original_height
                         scaled_width = int(original_width * scale_factor)
                         scaled_height = target_emoji_height
-                        print(f"    Scaling final emoji segment '{current_segment_text}' from H:{original_height} to H:{scaled_height} (Factor: {scale_factor:.2f})")
+                        # print(f"    Scaling final emoji segment '{current_segment_text}' from H:{original_height} to H:{scaled_height} (Factor: {scale_factor:.2f})")
                         # Scaling done during render phase
 
                     # DEBUG PRINT: Print measured final segment dimensions
-                    print(f"  [Measure] Final Segment: '{current_segment_text}', Original W: {original_width}, H: {original_height} -> Used W: {scaled_width}, H: {scaled_height}")
+                    # print(f"  [Measure] Final Segment: '{current_segment_text}', Original W: {original_width}, H: {original_height} -> Used W: {scaled_width}, H: {scaled_height}")
 
                     # Store dimensions (potentially scaled)
                     segments.append({

@@ -40,7 +40,7 @@ def main():
     ui_font = pygame.font.Font(PANEL_FONT_PATH, 18) # Font for UI text
     log_font = pygame.font.Font(PANEL_FONT_PATH, 14) # Smaller font for event log
     # Create Simulation Components
-    weather = Weather(weather_config, SCREEN_WIDTH, SCREEN_HEIGHT) # Pass weather config section
+    weather = Weather(config_manager, SCREEN_WIDTH, SCREEN_HEIGHT) # Pass the main config manager
     city = City(SCREEN_WIDTH, SCREEN_HEIGHT) # City will use config_manager internally now
 
     # Store sims in a dictionary for easy lookup by ID
@@ -361,7 +361,7 @@ def main():
                 SCREEN_WIDTH,
                 SCREEN_HEIGHT
             )
-       
+
        # --- Draw Test Bubble ---
         # --- Draw Test Bubble ---
         if show_test_bubble:

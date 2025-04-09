@@ -4,37 +4,27 @@ import pygame
 class Weather:
     """Manages the simulation's weather system."""
 
-    def __init__(self, config, screen_width, screen_height):
-        """Initializes the weather system using simulation config."""
-        self.states = config.get('weather', {}).get('states', ["Sunny", "Cloudy", "Rainy", "Snowy"])
-        self.colors = {
-            state: tuple(color)
-            for state, color in config.get('weather', {}).get('colors', {
-                "Sunny": [135, 206, 250],
-                "Cloudy": [169, 169, 169],
-                "Rainy": [100, 100, 100],
-                "Snowy": [200, 200, 200]
-            }).items()
-        }
     # TRANSITION_TIME = 10.0 # Removed, now loaded from config
 
-    def __init__(self, config, screen_width, screen_height):
+    def __init__(self, config_manager, screen_width, screen_height):
         """Initializes the weather system using simulation config."""
-        self.config = config
-        self.weather_config = self.config.get('weather', {})
-        self.change_frequency = self.weather_config.get('weather_change_frequency', 60.0)
-        self.transition_duration = self.config.get('simulation', {}).get('weather_transition_time', 1.0)
-        
-        # Initialize states and colors from config
-        self.states = self.weather_config.get('states', ["Sunny", "Cloudy", "Rainy", "Snowy"])
-        self.colors = {
-            state: tuple(color)
-            for state, color in self.weather_config.get('colors', {
+        self.config_manager = config_manager
+
+        # Use config_manager directly with full paths
+        self.change_frequency = self.config_manager.get_entry('weather.weather_change_frequency', 60.0)
+        self.transition_duration = self.config_manager.get_entry('simulation.weather_transition_time', 1.0)
+
+        # Initialize states and colors from config_manager
+        self.states = self.config_manager.get_entry('weather.states', ["Sunny", "Cloudy", "Rainy", "Snowy"])
+        default_colors = { # Define default here for clarity
                 "Sunny": [135, 206, 250],
                 "Cloudy": [169, 169, 169],
                 "Rainy": [100, 100, 100],
                 "Snowy": [200, 200, 200]
-            }).items()
+            }
+        self.colors = {
+            state: tuple(color)
+            for state, color in self.config_manager.get_entry('weather.colors', default_colors).items()
         }
 
         self.current_state = random.choice(self.states)
@@ -52,7 +42,7 @@ class Weather:
 
     def weather_update(self, dt):
         """Updates the weather state based on time and manages effects."""
-        enable_weather_changes = self.weather_config.get('enable_weather_changes', False)
+        enable_weather_changes = self.config_manager.get_entry('weather.enable_weather_changes', False)
         if not enable_weather_changes:
             # Still update effects even if weather type doesn't change
             self._effects_update(dt)
@@ -64,6 +54,8 @@ class Weather:
             old_state = self.current_state
             # Avoid immediately switching back to the same state
             possible_new_states = [s for s in self.states if s != old_state]
+            if not possible_new_states: # Handle case where there's only one state
+                possible_new_states = self.states
             self.current_state = random.choice(possible_new_states)
             print(f"Weather changed from {old_state} to {self.current_state}")  # Log change
             # Start transition effect

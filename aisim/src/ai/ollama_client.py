@@ -79,7 +79,7 @@ class OllamaClient:
             history=history_str,
             personality_info=personality_info # Use pre-formatted string
         )
-        print(f"Sim {sim_id}\n---------\n {prompt}\n---------\n") # Debug
+        # print(f"Sim {sim_id}\n---------\n {prompt}\n---------\n") # Debug
         result = None
         try:
             # Note: The ollama library itself doesn't have an explicit timeout for generate.
@@ -89,7 +89,7 @@ class OllamaClient:
             # Basic cleanup: remove potential self-prompting if the model includes it
             if result.startswith(f"{my_name}:"):
                 result = result[len(f"{my_name}:"):].strip()
-            print(f"Sim {sim_id}\n---------\n {result}\n---------\n") # Debug
+            # print(f"Sim {sim_id}\n---------\n {result}\n---------\n") # Debug
         except Exception as e:
             print(f"Error communicating with Ollama for Sim {sim_id} (conversation): {e}")
             result = f"({self.model} unavailable)" # Placeholder conversation response on error
