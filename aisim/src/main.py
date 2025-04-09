@@ -12,7 +12,8 @@ from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
 from aisim.src.core.logger import Logger
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core import interaction
-from aisim.src.core.panel import draw_panel_details, draw_bubble
+from aisim.src.core.panel import draw_panel_details
+from aisim.src.core.text import draw_bubble
 
 print(f"Current working directory: {os.getcwd()}")
 print(f"Python sys.path: {sys.path}")

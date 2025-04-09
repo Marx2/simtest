@@ -7,7 +7,7 @@ from typing import List, Dict, Optional
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import check_interactions, _end_interaction
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, change_direction, movement_update
-from aisim.src.core.panel import draw_bubble
+from aisim.src.core.text import draw_bubble
 from aisim.src.core.personality import _assign_sex, _generate_personality, _format_personality_for_prompt
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
