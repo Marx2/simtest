@@ -83,39 +83,36 @@ def initialize_fonts(font=None):
         font = PANEL_FONT # Main font reference
         return font
 
-def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_color=BG_COLOR, max_width=150, padding=10, offset_y=-30, sim1: Optional['Sim'] = None, sim2: Optional['Sim'] = None):
-    """Draws a text bubble above a given position."""
+def format_text(text_lines, font, emoji_font, text_color, target_emoji_height):
+    """
+    Segments text lines into regular and emoji parts, measures dimensions,
+    handles emoji scaling, and calculates overall layout metrics.
 
-    font = initialize_fonts(font) # Initialize fonts if not already done
-    if not text or not font: # Also check if font initialization failed
-        return
+    Args:
+        text_lines: List of strings, where each string is a line of text.
+        font: Pygame font object for regular text.
+        emoji_font: Pygame font object for emojis.
+        text_color: The color to use for rendering text (for measurement).
+        target_emoji_height: The desired height to scale emojis down to.
 
-    # Determine text color based on romance level if sims are provided
-    final_text_color = text_color # Start with default
-    if sim1 and sim2:
-        # Check relationship from sim1's perspective (the owner of the bubble)
-        relation_to_sim2 = sim1.relationships.get(sim2.sim_id)
-        if relation_to_sim2 and relation_to_sim2.get("romance", 0.0) >= HIGH_ROMANCE_THRESHOLD:
-            final_text_color = RED_COLOR # Red color for high romance
-            # print(f"Debug: High romance detected between {sim1.first_name} and {sim2.first_name}. Using RED.") # Optional debug
-
-    lines = wrap_text_compact(text, font, max_width)
-    if not lines: # Don't draw if wrapping results in no lines
-        return
-
-    # --- Measurement Phase ---
-    if not PANEL_FONT or not PANEL_EMOJI_FONT:
-        print("Error: Fonts not initialized, cannot draw bubble.")
-        return
+    Returns:
+        A dictionary containing:
+        - 'measured_lines': A list of dictionaries, each representing a line
+                          with its segments, width, and height.
+        - 'max_measured_width': The maximum width found across all lines.
+        - 'total_content_height': The sum of the effective heights of all lines.
+    """
+    if not font or not emoji_font:
+        print("Error: Fonts not provided to format_text.")
+        # Return default structure to avoid crashes downstream
+        return {'measured_lines': [], 'max_measured_width': 0, 'total_content_height': 0}
 
     measured_lines = []
     max_measured_width = 0
-    # Target height for scaling emojis (use text font line size)
-    target_emoji_height = PANEL_FONT.get_linesize()
-    base_line_height = target_emoji_height # Use text font linesize for empty/text lines
+    base_line_height = font.get_linesize() # Use text font linesize for base height
     total_content_height = 0
 
-    for line_text in lines:
+    for line_text in text_lines:
         if not line_text:
             # Use base font line height for empty lines
             measured_lines.append({'text': '', 'width': 0, 'height': base_line_height, 'segments': []})
@@ -131,7 +128,7 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
         for char in line_text:
             char_is_emoji = is_emoji(char)
             # Determine font for the *current* character being processed
-            char_font = PANEL_EMOJI_FONT if char_is_emoji else PANEL_FONT
+            char_font = emoji_font if char_is_emoji else font
 
             if not char_font: # Safety check if a font failed to load
                 print(f"Warning: Font not available for character '{char}'")
@@ -143,11 +140,11 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
             elif char_is_emoji == current_is_emoji: # Continue segment
                 current_segment_text += char
             else: # End previous segment
-                prev_font = PANEL_EMOJI_FONT if current_is_emoji else PANEL_FONT
+                prev_font = emoji_font if current_is_emoji else font
                 if current_segment_text and prev_font: # Ensure segment and font are valid
                     try:
                         # Render to measure actual dimensions
-                        temp_surf = prev_font.render(current_segment_text, True, final_text_color) # Use final_text_color
+                        temp_surf = prev_font.render(current_segment_text, True, text_color)
                         original_width = temp_surf.get_width()
                         original_height = temp_surf.get_height()
 
@@ -161,10 +158,6 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
                             scaled_width = int(original_width * scale_factor)
                             scaled_height = target_emoji_height # Set to target
                             # print(f"    Scaling emoji segment '{current_segment_text}' from H:{original_height} to H:{scaled_height} (Factor: {scale_factor:.2f})")
-                            # Note: Scaling done during render phase to save memory unless surfaces stored
-
-                        # DEBUG PRINT: Print measured segment dimensions (before potential scaling)
-                        # print(f"  [Measure] Segment: '{current_segment_text}', Original W: {original_width}, H: {original_height} -> Used W: {scaled_width}, H: {scaled_height}")
 
                         # Store dimensions (potentially scaled) for layout
                         segments.append({
@@ -188,11 +181,11 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
 
         # Add the last segment
         if current_segment_text:
-            last_font = PANEL_EMOJI_FONT if current_is_emoji else PANEL_FONT
+            last_font = emoji_font if current_is_emoji else font
             if last_font:
                 try:
                     # Render to measure actual dimensions
-                    temp_surf = last_font.render(current_segment_text, True, final_text_color) # Use final_text_color
+                    temp_surf = last_font.render(current_segment_text, True, text_color)
                     original_width = temp_surf.get_width()
                     original_height = temp_surf.get_height()
 
@@ -206,10 +199,6 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
                         scaled_width = int(original_width * scale_factor)
                         scaled_height = target_emoji_height
                         # print(f"    Scaling final emoji segment '{current_segment_text}' from H:{original_height} to H:{scaled_height} (Factor: {scale_factor:.2f})")
-                        # Scaling done during render phase
-
-                    # DEBUG PRINT: Print measured final segment dimensions
-                    # print(f"  [Measure] Final Segment: '{current_segment_text}', Original W: {original_width}, H: {original_height} -> Used W: {scaled_width}, H: {scaled_height}")
 
                     # Store dimensions (potentially scaled)
                     segments.append({
@@ -236,7 +225,46 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
         # Use the effective line height for total height calculation
         total_content_height += line_effective_height
 
-    # --- Dimension Calculation Phase ---
+    return {
+        'measured_lines': measured_lines,
+        'max_measured_width': max_measured_width,
+        'total_content_height': total_content_height
+    }
+
+
+def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_color=BG_COLOR, max_width=150, padding=10, offset_y=-30, sim1: Optional['Sim'] = None, sim2: Optional['Sim'] = None):
+    """Draws a text bubble above a given position."""
+
+    font = initialize_fonts(font) # Initialize fonts if not already done
+    if not text or not font or not PANEL_EMOJI_FONT: # Also check if fonts initialized
+        return
+
+    # Determine text color based on romance level if sims are provided
+    final_text_color = text_color # Start with default
+    if sim1 and sim2:
+        # Check relationship from sim1's perspective (the owner of the bubble)
+        relation_to_sim2 = sim1.relationships.get(sim2.sim_id)
+        if relation_to_sim2 and relation_to_sim2.get("romance", 0.0) >= HIGH_ROMANCE_THRESHOLD:
+            final_text_color = RED_COLOR # Red color for high romance
+
+    # Wrap text first
+    lines = wrap_text_compact(text, font, max_width)
+    if not lines: # Don't draw if wrapping results in no lines
+        return
+
+    # --- Format and Measure Text ---
+    target_emoji_height = font.get_linesize() # Use main font line size as target
+    formatted_data = format_text(lines, font, PANEL_EMOJI_FONT, final_text_color, target_emoji_height)
+
+    measured_lines = formatted_data['measured_lines']
+    max_measured_width = formatted_data['max_measured_width']
+    total_content_height = formatted_data['total_content_height']
+
+    if not measured_lines: # Don't draw if formatting resulted in nothing
+        return
+
+
+    # --- Bubble Dimension Calculation Phase ---
     bubble_width = max_measured_width + (2 * padding)
     # Bubble height now based on sum of effective heights per line
     bubble_height = total_content_height + (2 * padding)
@@ -247,7 +275,7 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
     if bubble_y < 0:
         bubble_y = 0
 
-    # --- Render Phase ---
+    # --- Bubble Render Phase ---
     # Surface creation uses updated bubble_height
     try:
         bubble_surface = pygame.Surface((int(bubble_width), int(bubble_height)), pygame.SRCALPHA) # Ensure integer dimensions
@@ -257,10 +285,11 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
          print(f"Error creating bubble surface (width={bubble_width}, height={bubble_height}): {e}")
          return # Cannot proceed if surface creation fails
 
+    # --- Text Render Phase (using formatted_data) ---
     current_y = padding
-    for line_data in measured_lines:
-        if not line_data['text']:
-            current_y += line_data['height'] # Advance Y based on stored height (base_line_height)
+    for line_data in measured_lines: # Use measured_lines from formatted_data
+        if not line_data.get('segments'): # Check if line has segments (handles empty lines correctly)
+            current_y += line_data['height'] # Advance Y based on stored height
             continue
 
         # Center the line horizontally based on its measured width
@@ -268,52 +297,53 @@ def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_col
         start_x = max(padding, start_x) # Ensure it respects padding
 
         current_x = start_x
+        line_bottom_y = current_y + line_data['height'] # Pre-calculate the bottom edge for this line
 
         for segment in line_data['segments']:
             if not segment['font']:
                 print(f"Warning: Font missing for segment '{segment['text']}'. Skipping render.")
                 continue
             try:
-                # Re-render the segment
-                text_surface = segment['font'].render(segment['text'], True, final_text_color) # Use final_text_color
+                # 1. Re-render the original segment text
+                text_surface = segment['font'].render(segment['text'], True, final_text_color)
 
-                # Scale if it's an emoji segment and scaling is needed
+                # 2. Determine blit surface and dimensions (use pre-calculated)
                 blit_surface = text_surface
-                final_width = segment['width'] # Use potentially scaled width stored from measurement
-                final_height = segment['height'] # Use potentially scaled height
+                blit_width = segment['width'] # Use pre-calculated width
+                blit_height = segment['height'] # Use pre-calculated height
 
-                if segment['is_emoji'] and segment['original_height'] > target_emoji_height and target_emoji_height > 0:
-                     # Re-calculate scale factor and scale
-                     # Avoids storing many surfaces, but recalculates scale
-                     scale_factor = target_emoji_height / segment['original_height']
-                     scaled_width_render = int(segment['original_width'] * scale_factor)
-                     # Ensure final_width/height match calculation
-                     final_width = scaled_width_render
-                     final_height = target_emoji_height
+                # 3. Scale if necessary (only if emoji and dimensions differ)
+                original_width = segment['original_width']
+                original_height = segment['original_height']
+                if segment['is_emoji'] and (blit_width != original_width or blit_height != original_height):
                      try:
-                         blit_surface = pygame.transform.smoothscale(text_surface, (final_width, final_height))
+                         # Use the pre-calculated blit_width and blit_height for scaling target
+                         blit_surface = pygame.transform.smoothscale(text_surface, (blit_width, blit_height))
                      except (ValueError, pygame.error) as scale_err:
-                         print(f"Error scaling surface for '{segment['text']}': {scale_err}")
-                         blit_surface = text_surface # Fallback to unscaled if error
-                         final_width = segment['original_width']
-                         final_height = segment['original_height']
+                         print(f"Error scaling surface for '{segment['text']}': {scale_err}. Using original.")
+                         # Fallback to original surface and dimensions if scaling fails
+                         blit_surface = text_surface
+                         blit_width = original_width
+                         blit_height = original_height
 
-
-                # Calculate blit position using potentially scaled dimensions
-                # Align bottom edge using the line's max height (line_data['height'])
+                # 4. Calculate blit position
                 segment_rect = blit_surface.get_rect()
                 segment_rect.left = int(current_x)
-                segment_rect.bottom = int(current_y + line_data['height']) # Align bottom edge to line bottom
+                # Align bottom edge to the pre-calculated line bottom edge
+                segment_rect.bottom = int(line_bottom_y)
 
+                # 5. Blit the (potentially scaled) surface
                 bubble_surface.blit(blit_surface, segment_rect)
-                current_x += final_width # Advance by the width actually used for blitting
+
+                # 6. Advance X position
+                current_x += blit_width # Advance by the width used for blitting
 
             except pygame.error as e:
                  print(f"Error rendering segment '{segment['text']}' with font {segment['font']}: {e}")
             except AttributeError:
                  print(f"Error: Font object invalid for segment '{segment['text']}'. Font: {segment['font']}")
 
-        current_y += line_data['height'] # Move to the next line position based on the current line's max height
+        current_y = line_bottom_y # Move to the start of the next line (which is the bottom of the current line)
 
     # Blit the complete bubble surface onto the main screen
     screen.blit(bubble_surface, (int(bubble_x), int(bubble_y))) # Ensure integer coordinates
