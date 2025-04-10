@@ -5,14 +5,15 @@ aisim is a simulation of a city. It simulates the behavior of people in a city, 
 ## Installation
 
 ```bash
+python3 -m venv aisim
+source venv_pygame/bin/activate
 pip install -r requirements.txt
 ```
 
 ## Usage
 
 ```bash
-cd simtest
-conda activate aisim && conda run -n aisim python -m aisim.src.main
+aisim python -m aisim.src.main
 ```
 
 ## Test

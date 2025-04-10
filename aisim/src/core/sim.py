@@ -6,7 +6,7 @@ from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import _send_conversation_request # Import the function
 from aisim.src.core.interaction import check_interactions, _end_interaction
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, movement_update
-from aisim.src.core.text import draw_bubble
+# from aisim.src.core.text import draw_bubble # Removed - Bubble drawing handled in main loop now
 from aisim.src.core.personality import _assign_sex, load_or_generate_personality_for_sim
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
@@ -298,9 +298,8 @@ class Sim:
                 bubble_text_to_display = None
 
             # --- Draw Bubble if text is available ---
-            # print(f"SIM {self.character_name} Drawing bubble: {bubble_text_to_display == True}")
-            if bubble_text_to_display:
-                # Call the unified draw_bubble function
-                draw_bubble(screen, bubble_text_to_display, sim_pos, sim1=self, sim2=partner)
+            # print(f"SIM {self.character_name} Should draw bubble: {bubble_text_to_display is not None}")
+            # Bubble drawing is now handled in the main loop using pygame_gui
+            pass # Keep the timer logic above, but remove the actual draw call here
 
 

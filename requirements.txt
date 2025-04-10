@@ -1,0 +1,6 @@
+pygame-ce
+pygame_gui
+ollama
+pandas
+matplotlib
+networkx
