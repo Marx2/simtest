@@ -67,7 +67,9 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_p: # Toggle pause
+                if event.key == pygame.K_ESCAPE:  # Close panel on Escape
+                    detailed_sim = None
+                elif event.key == pygame.K_p: # Toggle pause
                     paused = not paused
                 elif event.key in time_scales: # Change speed
                      time_scale = time_scales[event.key]
@@ -76,8 +78,9 @@ def main():
                      show_test_bubble = not show_test_bubble
                      print(f"Test bubble {'enabled' if show_test_bubble else 'disabled'}")
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1: # Left click
+                if event.button == 1:  # Left click
                     mouse_x, mouse_y = event.pos
+                    mouse_pos = event.pos  # Store mouse position
                     current_time_ms = pygame.time.get_ticks()
                     clicked_on_sim_object = None
                     min_dist_sq = float('inf')
@@ -320,17 +323,27 @@ def main():
         # --- Draw Sim Details Panel ---
         if detailed_sim:
             # Call the new function to draw the panel
+            # Initialize panel sections expanded state
+            panel_sections_expanded = {'personality': False, 'romance': False, 'conversation_history': False}
+
             # The function now returns the potentially clamped scroll offset
-            panel_scroll_offset = draw_panel_details(
-                screen,
-                detailed_sim,
-                panel_scroll_offset,
-                sims_dict,
-                ui_font,
-                log_font,
-                SCREEN_WIDTH,
-                SCREEN_HEIGHT
+            panel_details_result = draw_panel_details(
+                screen=screen,
+                detailed_sim=detailed_sim,
+                panel_scroll_offset=panel_scroll_offset,
+                sims_dict=sims_dict,
+                ui_font=ui_font,
+                log_font=log_font,
+                SCREEN_WIDTH=SCREEN_WIDTH,
+                SCREEN_HEIGHT=SCREEN_HEIGHT,
+                panel_sections_expanded=panel_sections_expanded,
+                mouse_pos=mouse_pos
             )
+
+            if panel_details_result is None:
+                detailed_sim = None
+            else:
+                panel_scroll_offset = panel_details_result
 
         # --- Draw Test Bubble ---
         if show_test_bubble:
