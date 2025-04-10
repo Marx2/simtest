@@ -1,0 +1,88 @@
+{
+    "defaults":
+    {
+        "colours":
+        {
+            "normal_text": "#f0f0f0",
+            "dark_bg": "#323232",
+            "normal_border": "#808080",
+            "hovered_border": "#A0A0A0",
+            "disabled_border": "#404040",
+            "selected_border": "#C0C0C0",
+            "active_border": "#FFFFFF",
+            "filled_bar": "#008000",
+            "unfilled_bar": "#800000"
+        }
+    },
+    "label":
+    {
+        "font":
+        {
+            "name": "Monaco-Linux",
+            "size": "14",
+            "regular_path": "aisim/src/graphics/fonts/Monaco-Linux.ttf",
+            "bold_path": "aisim/src/graphics/fonts/Monaco-Linux.ttf",
+            "italic_path": "aisim/src/graphics/fonts/Monaco-Linux.ttf",
+            "bold_italic_path": "aisim/src/graphics/fonts/Monaco-Linux.ttf"
+        },
+        "misc": {
+             "text_horiz_alignment": "left"
+        }
+    },
+    "window":
+    {
+        "font":
+        {
+            "name": "Monaco-Linux",
+            "size": "14",
+            "regular_path": "aisim/src/graphics/fonts/Monaco-Linux.ttf"
+        },
+        "colours":
+        {
+            "dark_bg": "#323232CC",
+            "title_bar": "#404040FF",
+            "normal_border": "#808080FF"
+        }
+    },
+    "textbox":
+    {
+         "font":
+        {
+            "name": "Monaco-Linux",
+            "size": "14",
+            "regular_path": "aisim/src/graphics/fonts/Monaco-Linux.ttf"
+        },
+        "colours":
+        {
+            "dark_bg": "#202020CC",
+            "normal_text": "#f0f0f0"
+        },
+        "misc":
+        {
+            "text_horiz_alignment_padding": "5",
+            "text_vert_alignment_padding": "5"
+        }
+    },
+    "button":
+    {
+        "font":
+        {
+            "name": "Monaco-Linux",
+            "size": "14",
+            "regular_path": "aisim/src/graphics/fonts/Monaco-Linux.ttf"
+        },
+        "colours":
+        {
+            "normal_bg": "#505050",
+            "hovered_bg": "#606060",
+            "disabled_bg": "#404040",
+            "selected_bg": "#506070",
+            "active_bg": "#707070",
+            "normal_text": "#f0f0f0",
+            "hovered_text": "#ffffff",
+            "disabled_text": "#a0a0a0",
+            "selected_text": "#ffffff",
+            "active_text": "#ffffff"
+        }
+    }
+}
