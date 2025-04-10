@@ -59,7 +59,10 @@ def main():
     last_click_time = 0
     last_clicked_sim_id = None
     DOUBLE_CLICK_TIME = 500 # Milliseconds
-    panel_scroll_offset = 0 # Initialize scroll offset
+    panel_state = {} # Initialize panel state dictionary
+    scrollbar_dragging = False # Track if scrollbar handle is being dragged
+    drag_start_y = 0
+    drag_start_offset = 0
     show_test_bubble = False # Flag to show the test bubble
     while running:
         # Event handling
@@ -72,111 +75,186 @@ def main():
                 elif event.key in time_scales: # Change speed
                      time_scale = time_scales[event.key]
                      print(f"Time scale set to: {time_scale}x")
+                elif event.key == pygame.K_ESCAPE and detailed_sim: # Close panel with Escape
+                    detailed_sim = None
+                    panel_state = {} # Clear state when closing
                 elif event.key == pygame.K_e: # Toggle test bubble
                      show_test_bubble = not show_test_bubble
                      print(f"Test bubble {'enabled' if show_test_bubble else 'disabled'}")
+            # --- MOUSE BUTTON DOWN ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1: # Left click
                     mouse_x, mouse_y = event.pos
                     current_time_ms = pygame.time.get_ticks()
-                    clicked_on_sim_object = None
-                    min_dist_sq = float('inf')
+                    panel_interacted = False # Flag if click was handled by the panel UI
 
-                    # Find the closest sim to the click
-                    for sim in sims_dict.values():
-                        # Use sprite dimensions for click detection if available
-                        # Use sim's own sprite dimensions now loaded from config
-                        sim_rect = pygame.Rect(sim.x - sim.sprite_width // 2, sim.y - sim.sprite_height // 2, sim.sprite_width, sim.sprite_height)
-                        if sim_rect.collidepoint(mouse_x, mouse_y):
-                             # Calculate distance for tie-breaking if multiple sprites overlap
-                             dist_sq = (sim.x - mouse_x)**2 + (sim.y - mouse_y)**2
-                             if dist_sq < min_dist_sq:
-                                 min_dist_sq = dist_sq
-                                 clicked_on_sim_object = sim
-                             # print(f"Clicked on Sim {sim.sim_id} rect") # Debug print
+                    # --- Panel Interaction Check (if panel is open) ---
+                    if detailed_sim:
+                        # Use the correct panel dimensions
+                        panel_width_check = 450
+                        panel_height_check = 450
+                        panel_x_check = (SCREEN_WIDTH - panel_width_check) // 2
+                        panel_y_check = (SCREEN_HEIGHT - panel_height_check) // 2
+                        panel_rect_check = pygame.Rect(panel_x_check, panel_y_check, panel_width_check, panel_height_check)
 
-                    # --- Handle Click Logic ---
-                    if clicked_on_sim_object:
-                        # --- Double Click Check ---
-                        time_since_last_click = current_time_ms - last_click_time
-                        if clicked_on_sim_object.sim_id == last_clicked_sim_id and time_since_last_click < DOUBLE_CLICK_TIME:
-                            print(f"Double-clicked Sim: {clicked_on_sim_object.sim_id}")
-                            detailed_sim = clicked_on_sim_object # Show details panel
-                            selected_sim = clicked_on_sim_object # Also select for log view
-                            selected_tile_info = None # Clear tile info when selecting sim
-                            panel_scroll_offset = 0 # Reset scroll on new panel
-                            # Reset double-click tracking
+                        if panel_rect_check.collidepoint(mouse_x, mouse_y):
+                            # Check close button first
+                            if panel_state.get("close_button_rect") and panel_state["close_button_rect"].collidepoint(mouse_x, mouse_y):
+                                print("Clicked panel close button")
+                                detailed_sim = None
+                                panel_state = {} # Clear state
+                                panel_interacted = True
+                            # Check headers if close wasn't clicked
+                            elif not panel_interacted:
+                                for section, rect in panel_state.get("header_rects", {}).items():
+                                    if rect.collidepoint(mouse_x, mouse_y):
+                                        state_key = f"{section}_expanded"
+                                        panel_state[state_key] = not panel_state.get(state_key, True) # Toggle
+                                        panel_state["scroll_offset"] = 0 # Reset scroll
+                                        print(f"Toggled section '{section}' to {panel_state[state_key]}")
+                                        panel_interacted = True
+                                        break
+                            # Check scrollbar if headers weren't clicked
+                            elif not panel_interacted:
+                                handle_rect = panel_state.get("scrollbar_handle_rect")
+                                track_rect = panel_state.get("scrollbar_track_rect")
+                                max_scroll = panel_state.get("max_scroll", 0)
+
+                                if handle_rect and handle_rect.collidepoint(mouse_x, mouse_y):
+                                    scrollbar_dragging = True
+                                    drag_start_y = mouse_y
+                                    drag_start_offset = panel_state.get("scroll_offset", 0)
+                                    print("Started dragging scrollbar handle")
+                                    panel_interacted = True
+                                elif track_rect and track_rect.collidepoint(mouse_x, mouse_y):
+                                    # Click on track: Page up/down
+                                    panel_visible_height = panel_height_check - 2 * 15 # padding
+                                    current_offset = panel_state.get("scroll_offset", 0)
+                                    if handle_rect and mouse_y < handle_rect.centery: # Clicked above handle
+                                        panel_state["scroll_offset"] = max(0, current_offset - panel_visible_height)
+                                    else: # Clicked below handle or no handle visible
+                                        panel_state["scroll_offset"] = min(max_scroll, current_offset + panel_visible_height)
+                                    # Clamp
+                                    panel_state["scroll_offset"] = max(0, min(max_scroll, panel_state["scroll_offset"]))
+                                    print(f"Clicked scrollbar track. New offset: {panel_state['scroll_offset']}")
+                                    panel_interacted = True
+                            # If click was inside panel but not on interactive element, set flag
+                            if not panel_interacted:
+                                panel_interacted = True # Still counts as interacting with panel background
+
+                    # --- Process click on Sim/Background only if panel wasn't interacted with ---
+                    if not panel_interacted:
+                        clicked_on_sim_object = None
+                        min_dist_sq = float('inf')
+
+                        # Find the closest sim to the click
+                        for sim in sims_dict.values():
+                            sim_rect = pygame.Rect(sim.x - sim.sprite_width // 2, sim.y - sim.sprite_height // 2, sim.sprite_width, sim.sprite_height)
+                            if sim_rect.collidepoint(mouse_x, mouse_y):
+                                 dist_sq = (sim.x - mouse_x)**2 + (sim.y - mouse_y)**2
+                                 if dist_sq < min_dist_sq:
+                                     min_dist_sq = dist_sq
+                                     clicked_on_sim_object = sim
+
+                        # Handle Sim Click (Double/Single)
+                        if clicked_on_sim_object:
+                            time_since_last_click = current_time_ms - last_click_time
+                            if clicked_on_sim_object.sim_id == last_clicked_sim_id and time_since_last_click < DOUBLE_CLICK_TIME:
+                                print(f"Double-clicked Sim: {clicked_on_sim_object.sim_id}")
+                                detailed_sim = clicked_on_sim_object
+                                selected_sim = clicked_on_sim_object
+                                selected_tile_info = None
+                                panel_state = { # Initialize panel state
+                                    "scroll_offset": 0, "personality_expanded": True,
+                                    "romance_expanded": True, "history_expanded": True,
+                                    "close_button_rect": None, "header_rects": {},
+                                    "scrollbar_handle_rect": None, "scrollbar_track_rect": None,
+                                    "max_scroll": 0
+                                }
+                                last_click_time = 0
+                                last_clicked_sim_id = None
+                            else: # Single Click
+                                print(f"Single-clicked Sim: {clicked_on_sim_object.sim_id}")
+                                selected_sim = clicked_on_sim_object
+                                selected_tile_info = None
+                                # Don't close panel on single click
+                                last_click_time = current_time_ms
+                                last_clicked_sim_id = clicked_on_sim_object.sim_id
+                        # Handle Background Click
+                        else:
+                            selected_sim = None
+                            # Don't close panel on background click
                             last_click_time = 0
                             last_clicked_sim_id = None
-                        else:
-                            # --- Single Click on a Sim ---
-                            print(f"Single-clicked Sim: {clicked_on_sim_object.sim_id}")
-                            selected_sim = clicked_on_sim_object # Select for log view
-                            selected_tile_info = None # Clear tile info when selecting sim
-                            detailed_sim = None # Close details panel on single click
-                            # Update tracking for potential double-click
-                            last_click_time = current_time_ms
-                            last_clicked_sim_id = clicked_on_sim_object.sim_id
-                    else:
-                        # --- Clicked on Empty Space ---
-                        selected_sim = None # Deselect for log view
-                        detailed_sim = None # Close details panel
-                        last_click_time = 0 # Reset double-click tracking
-                        last_clicked_sim_id = None
+                            # Calculate tile info
+                            tile_col = mouse_x // TILE_SIZE
+                            tile_row = mouse_y // TILE_SIZE
+                            if 0 <= tile_row < city.grid_height and 0 <= tile_col < city.grid_width:
+                                tile_name = city.tile_map[tile_row][tile_col]
+                                tile_type = "unknown"
+                                if tile_name:
+                                    if tile_name.startswith('grass_'): tile_type = "grass"
+                                    elif tile_name.startswith('path_'): tile_type = "path"
+                                    elif tile_name.startswith('prop_'): tile_type = "prop"
+                                selected_tile_info = {'coords': (tile_col, tile_row), 'type': tile_type}
+                                print(f"Clicked empty space at tile {selected_tile_info['coords']} - Type: {selected_tile_info['type']}")
+                            else:
+                                selected_tile_info = None
+                                print("Clicked empty space outside grid")
 
-                        # Calculate tile coordinates from mouse position
-                        tile_col = mouse_x // TILE_SIZE
-                        tile_row = mouse_y // TILE_SIZE
-
-                        # Check if click is within grid bounds
-                        if 0 <= tile_row < city.grid_height and 0 <= tile_col < city.grid_width:
-                            tile_name = city.tile_map[tile_row][tile_col]
-                            tile_type = "unknown" # Default
-                            if tile_name:
-                                if tile_name.startswith('grass_'):
-                                    tile_type = "grass"
-                                elif tile_name.startswith('path_'):
-                                    tile_type = "path"
-                                elif tile_name.startswith('prop_'):
-                                    tile_type = "prop" # e.g., tree
-
-                            selected_tile_info = {'coords': (tile_col, tile_row), 'type': tile_type}
-                            print(f"Clicked empty space at tile {selected_tile_info['coords']} - Type: {selected_tile_info['type']}")
-                        else:
-                            selected_tile_info = None # Clicked outside grid
-                            print("Clicked empty space outside grid")
-
+            # --- MOUSE WHEEL ---
             elif event.type == pygame.MOUSEWHEEL:
-                 # Handle panel scrolling only if the panel is open
                  if detailed_sim:
                      mouse_pos = pygame.mouse.get_pos()
-                     # Define panel_rect here or ensure it's accessible
-                     # Re-calculate panel_rect based on current state if needed
-                     panel_width = 350
-                     panel_height = 450
-                     panel_x = (SCREEN_WIDTH - panel_width) // 2
-                     panel_y = (SCREEN_HEIGHT - panel_height) // 2
-                     panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+                     panel_width_scroll = 450
+                     panel_height_scroll = 450
+                     panel_x_scroll = (SCREEN_WIDTH - panel_width_scroll) // 2
+                     panel_y_scroll = (SCREEN_HEIGHT - panel_height_scroll) // 2
+                     panel_rect_scroll = pygame.Rect(panel_x_scroll, panel_y_scroll, panel_width_scroll, panel_height_scroll)
 
-                     if panel_rect.collidepoint(mouse_pos):
-                         # Adjust scroll offset based on wheel direction
-                         scroll_speed = 30 # Pixels per wheel tick
-                         panel_scroll_offset -= event.y * scroll_speed
-                         # Clamping will happen during drawing after content height is known
+                     if panel_rect_scroll.collidepoint(mouse_pos):
+                         scroll_speed = 30
+                         current_offset = panel_state.get("scroll_offset", 0)
+                         max_scroll = panel_state.get("max_scroll", 0)
+                         panel_state["scroll_offset"] = current_offset - event.y * scroll_speed
+                         panel_state["scroll_offset"] = max(0, min(max_scroll, panel_state["scroll_offset"])) # Clamp
 
+            # --- MOUSE MOTION (for scrollbar dragging) ---
+            elif event.type == pygame.MOUSEMOTION:
+                 if scrollbar_dragging and detailed_sim:
+                     mouse_x, mouse_y = event.pos
+                     delta_y = mouse_y - drag_start_y
 
-        # Calculate delta time (time since last frame)
+                     handle_rect = panel_state.get("scrollbar_handle_rect")
+                     track_rect = panel_state.get("scrollbar_track_rect")
+                     max_scroll = panel_state.get("max_scroll", 0)
+
+                     if handle_rect and track_rect and max_scroll > 0:
+                         scrollable_track_height = track_rect.height - handle_rect.height
+                         if scrollable_track_height > 0:
+                              scroll_ratio = max_scroll / scrollable_track_height
+                              delta_offset = delta_y * scroll_ratio
+                              new_offset = drag_start_offset + delta_offset
+                              panel_state["scroll_offset"] = max(0, min(max_scroll, new_offset)) # Clamp
+
+            # --- MOUSE BUTTON UP (stop scrollbar dragging) ---
+            elif event.type == pygame.MOUSEBUTTONUP:
+                 if event.button == 1: # Left button release
+                     if scrollbar_dragging:
+                         scrollbar_dragging = False
+                         print("Stopped dragging scrollbar handle")
+
+        # --- Game Logic Update --- (This block is now OUTSIDE the event loop)
         raw_dt = clock.tick(fps) / 1000.0 # Get raw delta time
 
         # Apply time controls
-        # dt is the time passed since the last frame (the smallest time unit) scaled by time_scale 
         if paused:
             dt = 0.0 # No time passes if paused
         else:
             dt = raw_dt * time_scale # Apply speed multiplier
-        # Game logic updates
-        # Only update simulation logic if time is passing
-        if dt > 0: # Only update simulation state if not paused
+
+        # Only update simulation state if time is passing
+        if dt > 0:
             current_sim_time += dt # Increment simulation time
             all_sims_list = list(sims_dict.values()) # Get list for passing to update
             for sim in all_sims_list:
@@ -321,10 +399,12 @@ def main():
         if detailed_sim:
             # Call the new function to draw the panel
             # The function now returns the potentially clamped scroll offset
-            panel_scroll_offset = draw_panel_details(
+            # Call the updated function, passing the panel_state dictionary
+            # The function now modifies panel_state directly and doesn't return the offset
+            draw_panel_details(
                 screen,
                 detailed_sim,
-                panel_scroll_offset,
+                panel_state, # Pass the state dictionary
                 sims_dict,
                 ui_font,
                 log_font,
