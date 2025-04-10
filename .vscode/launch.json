@@ -14,8 +14,7 @@
             "module": "aisim.src.main",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceFolder}",
-            "python": "/opt/homebrew/Caskroom/miniconda/base/envs/aisim/bin/python" // Replace with your actual conda env path
+            "cwd": "${workspaceFolder}"
 
         }
     ]
