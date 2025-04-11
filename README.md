@@ -3,20 +3,29 @@
 aisim is a simulation of a city. It simulates the behavior of people in a city, their interactions, movement, and the impact of weather. The simulation is done by using an LLM Ollama Phi4 model to generate events and interactions between sims.
 
 ## Installation
+Clone repository, enter it and then:
 
 ```bash
-python3 -m venv aisim
-source venv_pygame/bin/activate
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
+```
+
+```bash
+git clone 
+cd aisim
+python -m venv venv
+source aisim/venv/bin/activate
+pip install -r aisim/requirements.txt
 ```
 
 ## Usage
 
 ```bash
-aisim python -m aisim.src.main
+python -m aisim.src.main
 ```
 
-## Test
+## Test - not working yet
 
 ```bash
 python -m unittest aisim/tests/test_conversation.py
