@@ -8,14 +8,6 @@ Clone repository, enter it and then:
 ```bash
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-```
-
-```bash
-git clone 
-cd aisim
-python -m venv venv
-source aisim/venv/bin/activate
 pip install -r aisim/requirements.txt
 ```
 
