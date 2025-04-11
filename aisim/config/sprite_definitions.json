@@ -1,0 +1,147 @@
+[
+  {
+    "name": "grass_plain_1",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-grass.png",
+    "x": 0, "y": 0, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_tuft_1",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-grass.png",
+    "x": 32, "y": 0, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_pebble_1",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-grass.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": true
+  },
+   {
+    "name": "grass_plain_2",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-grass.png",
+    "x": 0, "y": 32, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_flowers_red_1",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-grass.png",
+    "x": 128, "y": 32, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_pebbles_2",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-grass.png",
+    "x": 0, "y": 64, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_flowers_red_dense",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-grass.png",
+    "x": 160, "y": 192, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "path_stone_h_straight",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 0, "y": 0, "width": 128, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_stone_h_end",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 0, "y": 32, "width": 128, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_h_straight",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 0, "y": 64, "width": 128, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_h_end",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 0, "y": 96, "width": 128, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_cobble_h_straight",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 0, "y": 128, "width": 128, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_cobble_h_end",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 0, "y": 160, "width": 128, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_stone_v_straight",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 128, "y": 0, "width": 32, "height": 128, "can_be_rotated": false
+  },
+  {
+    "name": "path_stone_v_end",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 160, "y": 0, "width": 32, "height": 128, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_v_straight",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 192, "y": 0, "width": 32, "height": 128, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_v_end",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 224, "y": 0, "width": 32, "height": 128, "can_be_rotated": false
+  },
+  {
+    "name": "path_cobble_v_straight",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 128, "y": 128, "width": 32, "height": 128, "can_be_rotated": false
+  },
+  {
+    "name": "path_cobble_v_end",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-paths.png",
+    "x": 160, "y": 128, "width": 32, "height": 128, "can_be_rotated": false
+  },
+  {
+    "name": "tree_pine",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 0, "y": 0, "width": 64, "height": 64, "can_be_rotated": false
+  },
+  {
+    "name": "barrel",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "fence_wood_horizontal",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 96, "y": 0, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "signpost_wood",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 32, "width": 32, "height": 64, "can_be_rotated": false
+  },
+  {
+    "name": "fence_wood_post",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 96, "y": 32, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "bush",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 128, "y": 32, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "water_pond_large",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-water.png",
+    "x": 0, "y": 0, "width": 128, "height": 96, "can_be_rotated": false
+  },
+  {
+    "name": "water_island_small",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-water.png",
+    "x": 128, "y": 0, "width": 64, "height": 64, "can_be_rotated": false
+  },
+  {
+    "name": "water_shore_straight_horizontal",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-water.png",
+    "x": 192, "y": 0, "width": 64, "height": 32, "can_be_rotated": false
+  },
+   {
+    "name": "water_shore_straight_vertical",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-water.png",
+    "x": 128, "y": 64, "width": 32, "height": 64, "can_be_rotated": false
+  }
+]

@@ -5,7 +5,8 @@ A simulation game where AI-driven characters interact in a dynamic environment w
 - Character behaviors and relationships
 - Environmental effects (weather)
 - AI-driven conversations and romance analysis
-- Visual representation with sprites and tiles
+- Visual representation with detailed, layered sprites using multiple tilesets
+- Map generation based on configurable sprite definitions
 
 ## Technology Stack
 - **Core**: Python 3
@@ -31,8 +32,10 @@ classDiagram
     }
 
     class City {
-        +grid
-        +graph
+        +tile_map # Stores sprite names for each grid cell
+        +graph    # For pathfinding
+        +sprite_lookup # Loaded sprite definitions
+        +source_images # Loaded tileset images
         +sims
         +update()
         +draw()
@@ -66,10 +69,11 @@ classDiagram
 - AI-driven conversations
 
 ### 2. Environment (City)
-- Grid-based tile system
-- Pathfinding graph
-- Tile rendering with layers
-- Sim management
+- Detailed map generation using sprites defined in `aisim/config/sprite_definitions.json`.
+- Utilizes multiple tilesets (`grass`, `paths`, `props`, `water`) for varied environments.
+- Pathfinding graph (`networkx`) for character movement.
+- Sprite rendering handles different dimensions and layering (e.g., props over grass).
+- Sim management within the city environment.
 
 ### 3. Weather System
 - Dynamic weather states
@@ -90,7 +94,7 @@ Managed via config.json with sections for:
 - AI model configuration
 - UI theming
 - Character attributes
-
+- Sprite definitions (`aisim/config/sprite_definitions.json`) for map visuals
 ## Data Flow
 1. Main loop updates sims, city, weather
 2. Sims interact via OllamaClient
