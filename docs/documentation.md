@@ -69,8 +69,8 @@ classDiagram
 - AI-driven conversations
 
 ### 2. Environment (City)
-- Detailed map generation using sprites defined in `aisim/config/sprite_definitions.json`.
-- Utilizes multiple tilesets (`grass`, `paths`, `props`, `water`) for varied environments.
+- Detailed map generation using sprites defined in `aisim/config/sprite_definitions.json` (for paths, props, water) and `aisim/config/sprite_grass.json` (for grass).
+- Utilizes multiple tilesets for varied environments.
 - Pathfinding graph (`networkx`) for character movement.
 - Sprite rendering handles different dimensions and layering (e.g., props over grass).
 - Sim management within the city environment.
@@ -94,7 +94,7 @@ Managed via config.json with sections for:
 - AI model configuration
 - UI theming
 - Character attributes
-- Sprite definitions (`aisim/config/sprite_definitions.json`) for map visuals
+- Sprite definitions (`aisim/config/sprite_definitions.json` and `aisim/config/sprite_grass.json`) for map visuals
 ## Data Flow
 1. Main loop updates sims, city, weather
 2. Sims interact via OllamaClient

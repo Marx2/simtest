@@ -1,0 +1,47 @@
+[
+  {
+    "name": "grass_tile_0_0",
+    "source_file": "aisim/src/graphics/v3/grass_tileset_3x3_32px.jpg",
+    "x": 0, "y": 0, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_tile_1_0",
+    "source_file": "aisim/src/graphics/v3/grass_tileset_3x3_32px.jpg",
+    "x": 32, "y": 0, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_tile_2_0",
+    "source_file": "aisim/src/graphics/v3/grass_tileset_3x3_32px.jpg",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_tile_0_1",
+    "source_file": "aisim/src/graphics/v3/grass_tileset_3x3_32px.jpg",
+    "x": 0, "y": 32, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_tile_1_1",
+    "source_file": "aisim/src/graphics/v3/grass_tileset_3x3_32px.jpg",
+    "x": 32, "y": 32, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_tile_2_1",
+    "source_file": "aisim/src/graphics/v3/grass_tileset_3x3_32px.jpg",
+    "x": 64, "y": 32, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_tile_0_2",
+    "source_file": "aisim/src/graphics/v3/grass_tileset_3x3_32px.jpg",
+    "x": 0, "y": 64, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_tile_1_2",
+    "source_file": "aisim/src/graphics/v3/grass_tileset_3x3_32px.jpg",
+    "x": 32, "y": 64, "width": 32, "height": 32, "can_be_rotated": true
+  },
+  {
+    "name": "grass_tile_2_2",
+    "source_file": "aisim/src/graphics/v3/grass_tileset_3x3_32px.jpg",
+    "x": 64, "y": 64, "width": 32, "height": 32, "can_be_rotated": true
+  }
+]

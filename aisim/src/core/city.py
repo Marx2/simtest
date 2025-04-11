@@ -24,39 +24,67 @@ class City:
         self.tileset_path = config_manager.get_entry('city.tileset_path', 'aisim/src/graphics/v3')
         
         self.graph = self._create_grid_graph()
-        self.sprite_definitions = []
+        self.sprite_definitions = [] # Combined list
+        self.grass_sprite_definitions = [] # Specific grass defs
         self.sprite_lookup = {}
         self.source_images = {}
-        self._load_assets() # Renamed from _load_tilesets to reflect loading JSON too
+        self._load_assets() # Loads both definition files and images
         self._create_tile_map() # Create a map of which tile to draw where
         self.sims = [] # Initialize sims list
         self.pending_romance_analysis = set() # Track (sim_id1, sim_id2) pairs awaiting analysis
         self.ollama_client_locked = False # Global lock for Ollama client access during conversations
     def _load_assets(self):
-        """Loads sprite definitions from JSON and the required tileset images."""
-        sprite_def_path = config_manager.get_entry('city.sprite_definitions_path', 'aisim/config/sprite_definitions.json')
+        """Loads sprite definitions from primary and grass JSON files, and the required tileset images."""
+        main_sprite_def_path = config_manager.get_entry('city.sprite_definitions_path', 'aisim/config/sprite_definitions.json')
+        grass_sprite_def_path = 'aisim/config/sprite_grass.json' # Hardcoded for now, could be config
+
         self.sprite_definitions = []
+        self.grass_sprite_definitions = []
         self.sprite_lookup = {}
         self.source_images = {}
+        all_definitions = []
 
-        # 1. Load Sprite Definitions
+        # 1. Load Main Sprite Definitions
         try:
-            with open(sprite_def_path, 'r') as f:
-                self.sprite_definitions = json.load(f)
-            print(f"Loaded {len(self.sprite_definitions)} sprite definitions from {sprite_def_path}")
-            # Create a lookup for faster access
-            self.sprite_lookup = {s['name']: s for s in self.sprite_definitions}
+            with open(main_sprite_def_path, 'r') as f:
+                main_defs = json.load(f)
+                # Filter out any grass sprites from the main file if they exist, just in case
+                main_defs_filtered = [s for s in main_defs if not s.get('name', '').startswith('grass_')]
+                all_definitions.extend(main_defs_filtered)
+            print(f"Loaded {len(main_defs_filtered)} non-grass sprite definitions from {main_sprite_def_path}")
         except FileNotFoundError:
-            print(f"Error: Sprite definition file not found at {sprite_def_path}")
-            return # Cannot proceed without definitions
+            print(f"Warning: Main sprite definition file not found at {main_sprite_def_path}")
+            # Continue if possible, maybe only grass is needed? Or return error? Let's continue.
         except json.JSONDecodeError as e:
-            print(f"Error decoding JSON from {sprite_def_path}: {e}")
-            return # Cannot proceed with invalid definitions
+            print(f"Error decoding JSON from {main_sprite_def_path}: {e}")
+            return # Cannot proceed with invalid main definitions
         except Exception as e:
-            print(f"An unexpected error occurred loading sprite definitions: {e}")
+            print(f"An unexpected error occurred loading main sprite definitions: {e}")
             return
 
-        # 2. Load Source Images
+        # 2. Load Grass Sprite Definitions
+        try:
+            with open(grass_sprite_def_path, 'r') as f:
+                self.grass_sprite_definitions = json.load(f)
+                all_definitions.extend(self.grass_sprite_definitions)
+            print(f"Loaded {len(self.grass_sprite_definitions)} grass sprite definitions from {grass_sprite_def_path}")
+        except FileNotFoundError:
+            print(f"Error: Grass sprite definition file not found at {grass_sprite_def_path}")
+            # If grass is essential, we should return here. Assuming it is.
+            return
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON from {grass_sprite_def_path}: {e}")
+            return # Cannot proceed with invalid grass definitions
+        except Exception as e:
+            print(f"An unexpected error occurred loading grass sprite definitions: {e}")
+            return
+
+        # 3. Finalize Combined Definitions and Lookup
+        self.sprite_definitions = all_definitions
+        self.sprite_lookup = {s['name']: s for s in self.sprite_definitions}
+        print(f"Total unique sprite definitions loaded: {len(self.sprite_definitions)}")
+
+        # 4. Load Source Images (based on combined definitions)
         loaded_sources = set()
         for sprite_def in self.sprite_definitions:
             source_file = sprite_def.get('source_file')
@@ -75,7 +103,15 @@ class City:
                         pass # Keep path as relative for now, assuming pygame handles it from CWD
 
                     print(f"Loading source image: {full_path}")
-                    image = pygame.image.load(full_path).convert_alpha()
+                    # Use convert() for JPG and convert_alpha() for PNG
+                    if full_path.lower().endswith('.png'):
+                        image = pygame.image.load(full_path).convert_alpha()
+                    elif full_path.lower().endswith('.jpg') or full_path.lower().endswith('.jpeg'):
+                        image = pygame.image.load(full_path).convert()
+                    else:
+                        # Fallback or raise error for unsupported types? Let's try convert_alpha as default.
+                        print(f"Warning: Unknown image format for {full_path}. Attempting convert_alpha().")
+                        image = pygame.image.load(full_path).convert_alpha()
                     self.source_images[source_file] = image
                     loaded_sources.add(source_file)
                 except pygame.error as e:
@@ -87,26 +123,30 @@ class City:
         print(f"Loaded {len(self.source_images)} unique source images.")
 
     def _create_tile_map(self):
-        """Creates a 2D array representing the visual tile map using loaded sprite definitions."""
+        """Creates a 2D array representing the visual tile map using loaded sprite definitions,
+           prioritizing grass sprites from the dedicated grass definition file."""
         self.tile_map = [[None for _ in range(self.grid_width)] for _ in range(self.grid_height)]
 
-        # Get lists of sprite names by type (simple name-based filtering)
-        grass_sprites = [s['name'] for s in self.sprite_definitions if s['name'].startswith('grass_')]
-        path_sprites = [s['name'] for s in self.sprite_definitions if s['name'].startswith('path_')]
-        water_sprites = [s['name'] for s in self.sprite_definitions if s['name'].startswith('water_')]
-        prop_sprites = [s['name'] for s in self.sprite_definitions if s['name'].startswith(('tree_', 'bush_', 'barrel', 'fence_', 'signpost_'))]
+        # Get lists of sprite names by type
+        # Use the dedicated grass definitions for grass selection
+        grass_sprites = [s['name'] for s in self.grass_sprite_definitions if s.get('name')]
+        # Use the combined list (all_definitions) filtered for other types
+        path_sprites = [s['name'] for s in self.sprite_definitions if s.get('name', '').startswith('path_')]
+        water_sprites = [s['name'] for s in self.sprite_definitions if s.get('name', '').startswith('water_')]
+        prop_sprites = [s['name'] for s in self.sprite_definitions if s.get('name', '').startswith(('tree_', 'bush_', 'barrel', 'fence_', 'signpost_'))]
 
         if not grass_sprites:
-             print("Warning: No grass sprites found in definitions. Map generation might fail.")
-             # Optionally fill with a fallback or return
-             default_grass = 'grass_plain_1' # Assume this exists? Risky.
+             print("Error: No grass sprites found in the dedicated grass definitions. Cannot generate map.")
+             # Need at least one grass sprite to function
+             return
         else:
              default_grass = random.choice(grass_sprites)
 
         # 1. Fill base with random grass
         for r in range(self.grid_height):
             for c in range(self.grid_width):
-                self.tile_map[r][c] = random.choice(grass_sprites) if grass_sprites else None
+                # Always use grass sprites from the dedicated list
+                self.tile_map[r][c] = random.choice(grass_sprites)
 
         # 2. Add some water (example: a large pond)
         if 'water_pond_large' in self.sprite_lookup:
@@ -250,8 +290,8 @@ class City:
             return
 
         # --- Draw Tiles using Sprite Definitions ---
-        # Get a default grass sprite for layering under props
-        default_grass_name = next((s['name'] for s in self.sprite_definitions if s['name'].startswith('grass_')), None)
+        # Get a default grass sprite (from the dedicated list) for layering under props
+        default_grass_name = next((s['name'] for s in self.grass_sprite_definitions if s.get('name')), None)
 
         for r in range(self.grid_height):
             for c in range(self.grid_width):
