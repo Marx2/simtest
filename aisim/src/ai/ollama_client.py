@@ -1,5 +1,4 @@
 import ollama
-# import os # No longer needed for CONFIG_PATH
 import threading # Added
 import queue # Added
 from typing import Optional, Tuple, List, Dict, Any # Added Any for Dict values
@@ -56,7 +55,6 @@ class OllamaClient:
             history=history_str,
             personality_info=personality_info # Use pre-formatted string
         )
-        # print(f"Sim {sim_id}\n---------\n {prompt}\n---------\n") # Debug
         result = None
         try:
             # Note: The ollama library itself doesn't have an explicit timeout for generate.
@@ -66,7 +64,6 @@ class OllamaClient:
             # Basic cleanup: remove potential self-prompting if the model includes it
             if result.startswith(f"{my_name}:"):
                 result = result[len(f"{my_name}:"):].strip()
-            # print(f"Sim {sim_id}\n---------\n {result}\n---------\n") # Debug
         except Exception as e:
             print(f"Error communicating with Ollama for Sim {sim_id} (conversation): {e}")
             result = f"({self.model} unavailable)" # Placeholder conversation response on error
@@ -80,15 +77,11 @@ class OllamaClient:
         """Requests a conversation response asynchronously, selecting prompt based on romance_level. Returns True if request started, False otherwise."""
         # Check global concurrent request limit first
         if len(self.active_requests) >= self.max_concurrent_requests:
-            # print(f"Sim {sim_id}: Cannot start conversation thread. Max concurrent requests ({self.max_concurrent_requests}) reached. Active: {self.active_requests}") # Debug
             return False
         # Then check if this specific sim already has a request
         if sim_id in self.active_requests:
-            # print(f"Sim {sim_id}: Ollama request already active. Ignoring new conversation request.") # Debug
             return False
 
-        # print(f"Starting Ollama conversation worker thread for Sim {sim_id}") # Debug
-        # print(f"Sim {sim_id}: Attempting to start conversation thread. Active requests: {self.active_requests}. Params: sim_id={sim_id}, my_name={my_name}, other_name={other_name}, history={history}, personality_info={personality_info}") # Added logging
         self.active_requests.add(sim_id)
         thread = threading.Thread(target=self._generate_conversation_worker, args=(sim_id, my_name, other_name, history, personality_info, romance_level), daemon=True)
         thread.start()
@@ -104,14 +97,13 @@ class OllamaClient:
         )
         analysis_result = "NEUTRAL" # Default
         try:
-            print(f"Analyzing romance between {sim1_name} ({sim1_id}) and {sim2_name} ({sim2_id})...") # Debug
-            # print(f"Analysis Prompt:\n{prompt}") # Verbose Debug
+            print(f"Analyzing romance between {sim1_name} ({sim1_id}) and {sim2_name} ({sim2_id})...")
             response = self.client.generate(model=self.model, prompt=prompt, stream=False)
             raw_result = response.get('response', '').strip().upper()
             # Basic validation: ensure it's one of the expected values
             if raw_result in ["INCREASE", "DECREASE", "NEUTRAL"]:
                 analysis_result = raw_result
-                print(f"Romance analysis result: {analysis_result}") # Debug
+                print(f"Romance analysis result: {analysis_result}")
             else:
                 print(f"Warning: Unexpected romance analysis result '{raw_result}'. Defaulting to NEUTRAL.")
         except Exception as e:
@@ -130,7 +122,7 @@ class OllamaClient:
 
     def request_romance_analysis(self, sim1_id: Any, sim1_name: str, sim2_id: Any, sim2_name: str, history: List[Dict[str, str]]) -> bool:
         """Requests asynchronous analysis of conversation romance level."""
-        print(f"Starting romance analysis worker thread for interaction between {sim1_id} and {sim2_id}") # Debug
+        print(f"Starting romance analysis worker thread for interaction between {sim1_id} and {sim2_id}")
         thread = threading.Thread(
             target=self._generate_romance_analysis_worker,
             args=(sim1_id, sim1_name, sim2_id, sim2_name, history),
@@ -144,13 +136,11 @@ class OllamaClient:
         try:
             # Get result dictionary without blocking
             result_data = self.results_queue.get_nowait()
-            # print(f"Retrieved result from queue: {result_data}") # Debug
             return result_data
         except queue.Empty:
             # Queue is empty, no results available
             return None
-
-    # --- The methods below were added/modified for romance analysis ---
+# --- The methods below were added/modified for romance analysis ---
 
     def _generate_romance_analysis_worker(self, sim1_id: Any, sim1_name: str, sim2_id: Any, sim2_name: str, history: List[Dict[str, str]]):
         """Worker function to analyze conversation history for romance change."""

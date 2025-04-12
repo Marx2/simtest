@@ -3,6 +3,7 @@ from typing import List
 import logging
 logging.basicConfig(level=logging.DEBUG)
 from aisim.src.core.configuration import config_manager
+BUBBLE_DISPLAY_TIME = config_manager.get_entry('simulation.bubble_display_time_seconds', 5.0) # Import for timer
 import random # Import random
 
 __all__ = ['check_interactions', '_end_interaction'] # Explicitly export functions
@@ -18,11 +19,8 @@ def check_interactions(self, all_sims, current_time, city): # Add city parameter
     for other_sim in all_sims:
         if other_sim.sim_id == self.sim_id:
             continue  # Don't interact with self
-        # print(f"Sim {self.sim_id}: Checking interaction with Sim {other_sim.sim_id}")
 
         dist = math.dist((self.x, self.y), (other_sim.x, other_sim.y))
-        # print(f"Sim {self.sim_id}: current_time={current_time}, last_interaction_time={self.last_interaction_time}")
-        # print(f"Sim {self.sim_id}: distance to Sim {other_sim.sim_id} = {dist}")
 
         # --- Interaction Start Condition ---
         can_interact_self = not self.is_interacting and (current_time - self.last_interaction_time > ignore_interaction_time)
@@ -59,7 +57,6 @@ def check_interactions(self, all_sims, current_time, city): # Add city parameter
                  self.conversation_history = None
                  other_sim.conversation_history = None
             
-        # TODO: Use personality traits to influence interaction chance/outcome
 
         # --- Post-Interaction Start Logic (Relationship, Memory, Logging) ---
         # This part runs regardless of whether a conversation was started,
@@ -89,7 +86,7 @@ def is_interaction_in_progress(sim1, all_sims):
 
 def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
     """Cleans up state at the end of an interaction, releasing the Ollama lock if held."""
-    print(f"Sim {self.sim_id}: Ending interaction with partner ID {self.conversation_partner_id}")
+    logging.info(f"Sim {self.sim_id}: Ending interaction with partner ID {self.conversation_partner_id}")
     partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
 
     # --- Release Ollama Lock if held ---
@@ -102,7 +99,7 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
         # or this sim timed out waiting to acquire the lock initially.
         # For simplicity, if _end_interaction is called and the lock is held, release it.
         # A more robust check might involve seeing who *was* waiting or whose turn it was.
-        print(f"Sim {self.sim_id}: Releasing Ollama lock during _end_interaction.")
+        logging.info(f"Sim {self.sim_id}: Releasing Ollama lock during _end_interaction.")
         city.ollama_client_locked = False
 
     # --- Capture data for romance analysis *before* clearing state ---
@@ -119,7 +116,6 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
     # --- Reset Partner State (if partner exists and was interacting) ---
     if partner and partner.is_interacting:
             partner.is_interacting = False
-            partner.talking_with = None # Optional, maybe remove later
             partner.conversation_history = None
             partner.conversation_message = None # Reset conversation bubble message
             partner.conversation_message_timer = 0.0 # Reset conversation bubble timer
@@ -130,7 +126,6 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
 
     # --- Reset Self State ---
     self.is_interacting = False
-    self.talking_with = None # Optional, maybe remove later
     self.conversation_history = None
     self.conversation_message = None # Reset conversation bubble message
     self.conversation_message_timer = 0.0 # Reset conversation bubble timer
@@ -148,17 +143,15 @@ def _end_interaction(self, city, all_sims: List['Sim']): # Add city parameter
             # Add pair to pending analysis lock
             analysis_pair = tuple(sorted((sim1_id, sim2_id))) # Ensure consistent ordering
             city.pending_romance_analysis.add(analysis_pair)
-            print(f"Added {analysis_pair} to pending romance analysis.") # Debug
+            logging.debug(f"Added {analysis_pair} to pending romance analysis.")
         except AttributeError:
-            print(f"ERROR: Sim {sim1_id} could not access ollama_client to request romance analysis.")
+            logging.error(f"Sim {sim1_id} could not access ollama_client to request romance analysis.")
     elif not final_history:
-        print(f"Skipping romance analysis between {sim1_name} and {sim2_name}: No conversation history.")
-    # else: # No need for explicit else, handled by sim2_id check
-    #     print(f"Skipping romance analysis for {sim1_name}: Partner was invalid.")
+        logging.info(f"Skipping romance analysis between {sim1_name} and {sim2_name}: No conversation history.")
 
 def handle_ollama_response(self, response_text: str, all_sims: List['Sim'], city):
     """Handles a response received from Ollama, releasing the lock and managing conversation state."""
-    print(f"Sim {self.sim_id}: Received Ollama response: '{response_text}'")
+    logging.info(f"Sim {self.sim_id}: Received Ollama response: '{response_text}'")
 
     # --- Release Ollama Lock ---
     # This function is called when *any* Ollama response arrives (conversation).
@@ -169,7 +162,7 @@ def handle_ollama_response(self, response_text: str, all_sims: List['Sim'], city
     if self.waiting_for_ollama_response and self.is_interacting: # Check if we were actually waiting for a *conversation* response
         if city.ollama_client_locked:
             city.ollama_client_locked = False
-            print(f"Sim {self.sim_id}: Released Ollama lock after receiving response.")
+            logging.info(f"Sim {self.sim_id}: Released Ollama lock after receiving response.")
         else:
             # This case might happen if the interaction ended prematurely elsewhere
             logging.warning(f"Sim {self.sim_id}: Received conversation response, but Ollama lock was already released.")
@@ -180,6 +173,7 @@ def handle_ollama_response(self, response_text: str, all_sims: List['Sim'], city
     if self.is_interacting and self.conversation_partner_id is not None:
         # --- Handle Conversation Response ---
         self.conversation_message = response_text
+        self.conversation_message_timer = BUBBLE_DISPLAY_TIME # Start the timer for the speaker's bubble
 
         # Add to history
         new_entry = {"speaker": self.first_name, "line": response_text}
@@ -191,18 +185,16 @@ def handle_ollama_response(self, response_text: str, all_sims: List['Sim'], city
         if partner:
             if partner.conversation_history is None: partner.conversation_history = []
             partner.conversation_history.append(new_entry) # Share history
-            # partner.is_my_turn_to_speak = True # It's partner's turn now
             partner.waiting_for_ollama_response = False # Partner isn't waiting yet (will wait on their update cycle)
-            # partner.conversation_last_response_time = current_time # Don't reset partner's timer here
-            print(f"Sim {self.sim_id}: Passed turn to {partner.sim_id}")
+            partner.is_my_turn_to_speak = True # Pass the turn to the partner
+            logging.info(f"Sim {self.sim_id}: Passed turn to {partner.sim_id}")
         else:
-            print(f"Sim {self.sim_id}: ERROR - Partner {self.conversation_partner_id} not found during response handling! Ending interaction.")
+            logging.error(f"Sim {self.sim_id}: Partner {self.conversation_partner_id} not found during response handling! Ending interaction.")
             _end_interaction(self, city, all_sims) # End interaction if partner vanished
 
         # Update self state *after* processing partner
-        # self.is_my_turn_to_speak = False # Not my turn anymore
+        self.is_my_turn_to_speak = False # It's no longer the speaker's turn
         self.conversation_turns += 1 # Increment turn counter *after* successfully speaking
-        # self.conversation_last_response_time = current_time # Don't reset self timer here, used for timeout *before* speaking
 
         # Check if max turns reached *after* this turn
         # Calculate max turns *per sim* based on total turns. Each sim speaks roughly half the total turns.
@@ -210,7 +202,7 @@ def handle_ollama_response(self, response_text: str, all_sims: List['Sim'], city
         max_turns_per_sim = (MAX_TOTAL_TURNS + 1) // 2
 
         if self.conversation_turns >= max_turns_per_sim:
-            print(f"Sim {self.sim_id}: Reached max turns ({self.conversation_turns}/{max_turns_per_sim}) in conversation with {self.conversation_partner_id}. Ending interaction.")
+            logging.info(f"Sim {self.sim_id}: Reached max turns ({self.conversation_turns}/{max_turns_per_sim}) in conversation with {self.conversation_partner_id}. Ending interaction.")
             _end_interaction(self, city, all_sims) # End interaction after reaching max turns
 
     elif not self.is_interacting:
@@ -228,7 +220,7 @@ def initiate_conversation(initiator_sim, other_sim, city, all_sims, current_time
     # Pending Romance Analysis Lock Check (Existing)
     analysis_pair = tuple(sorted((initiator_sim.sim_id, other_sim.sim_id))) # Ensure consistent ordering
     if analysis_pair in city.pending_romance_analysis:
-        # print(f"Conversation between {initiator_sim.sim_id} and {other_sim.sim_id} blocked: Pending romance analysis.") # Debug
+        # logging.debug(f"Conversation between {initiator_sim.sim_id} and {other_sim.sim_id} blocked: Pending romance analysis.")
         return # Don't start conversation if analysis is pending for this pair
 
     # Decide who speaks first *before* trying the lock
@@ -243,7 +235,7 @@ def initiate_conversation(initiator_sim, other_sim, city, all_sims, current_time
     if not city.ollama_client_locked:
         # Lock is available, acquire it and proceed
         city.ollama_client_locked = True
-        print(f"Sim {first_speaker.sim_id}: Acquired Ollama lock, initiating conversation with {second_speaker_listener.sim_id}")
+        logging.info(f"Sim {first_speaker.sim_id}: Acquired Ollama lock, initiating conversation with {second_speaker_listener.sim_id}")
 
         # Stop movement
         first_speaker.path = None
@@ -282,24 +274,21 @@ def initiate_conversation(initiator_sim, other_sim, city, all_sims, current_time
 
         if not request_successful:
             # Request failed, release lock and end interaction immediately
-            print(f"Sim {first_speaker.sim_id}: Initial conversation request failed. Releasing lock and ending interaction.")
+            logging.warning(f"Sim {first_speaker.sim_id}: Initial conversation request failed. Releasing lock and ending interaction.")
             city.ollama_client_locked = False # Release the lock
             # End interaction for both (this should handle cleanup including removing from active_partners)
             _end_interaction(first_speaker, city, all_sims)
             _end_interaction(second_speaker_listener, city, all_sims)
         else:
             # Request sent successfully
-            print(f"Sim {first_speaker.sim_id} speaks first. Initial request sent.")
+            logging.info(f"Sim {first_speaker.sim_id} speaks first. Initial request sent.")
 
     else:
         # Ollama lock is busy, cannot start conversation this cycle
-        # print(f"Sim {initiator_sim.sim_id}: Could not initiate conversation with {other_sim.sim_id}. Ollama lock busy.")
+        # logging.debug(f"Sim {initiator_sim.sim_id}: Could not initiate conversation with {other_sim.sim_id}. Ollama lock busy.")
         # Do nothing - sims remain available for other actions or future interaction attempts
         pass
 
-# Note: The 'self' parameter is removed as this function operates on specific speaker/listener pairs
-# and doesn't need the instance context in the same way _initiate_conversation might have.
-# The necessary 'self' context (like ollama_client, relationships) comes from the 'speaker' object.
 # Note: The 'self' parameter is removed as this function operates on specific speaker/listener pairs
 # and doesn't need the instance context in the same way _initiate_conversation might have.
 # The necessary 'self' context (like ollama_client, relationships) comes from the 'speaker' object.
@@ -312,7 +301,7 @@ def _send_conversation_request(speaker, listener, current_time: float) -> bool:
     # Get the romance level of the speaker towards the listener
     relationship_data = speaker.relationships.get(listener.sim_id, {})
     romance_level = relationship_data.get("romance", 0.0) # Default to 0.0
-    # print(f"Sim {speaker.sim_id}: Romance towards {listener.first_name} for request = {romance_level:.2f}") # Debug
+    # logging.debug(f"Sim {speaker.sim_id}: Romance towards {listener.first_name} for request = {romance_level:.2f}")
 
     try:
         # Make the request using the speaker's client
@@ -329,7 +318,7 @@ def _send_conversation_request(speaker, listener, current_time: float) -> bool:
             # Update speaker state on successful request dispatch
             speaker.waiting_for_ollama_response = True
             speaker.conversation_last_response_time = current_time # Record time request was sent
-            print(f"Sim {speaker.sim_id}: Conversation request sent. Waiting for response. Turn: {speaker.conversation_turns}")
+            logging.info(f"Sim {speaker.sim_id}: Conversation request sent. Waiting for response. Turn: {speaker.conversation_turns}")
             return True
         else:
             # The client itself indicated failure (e.g., queue full, internal error)

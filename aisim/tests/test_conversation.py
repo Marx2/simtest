@@ -27,26 +27,34 @@ class TestConversation(unittest.TestCase):
         response_text = "This is a test response from Ollama."
 
         # Create Sim instances
+        # Combine config values into sim_config dictionary
+        sim1_config = {
+            "character_name": "Abigail_Chen", # Needed for personality loading mock/fallback
+            "enable_talking": True,
+            "bubble_display_time_seconds": 5.0
+            # Add other necessary sim_config keys if Sim init requires them
+        }
         sim1 = Sim(
             sim_id="sim1",
             x=10,
             y=20,
             ollama_client=self.ollama_client,
-            enable_talking=True,
-            sim_config={},
-            bubble_display_time=5.0
+            sim_config=sim1_config
         )
         sim1.first_name = "Abigail_Chen"
         sim1.personality_description = "Kind and helpful"
 
+        sim2_config = {
+            "character_name": "Adam_Smith",
+            "enable_talking": True,
+            "bubble_display_time_seconds": 5.0
+        }
         sim2 = Sim(
             sim_id="sim2",
             x=30,
             y=40,
             ollama_client=self.ollama_client,
-            enable_talking=True,
-            sim_config={},
-            bubble_display_time=5.0
+            sim_config=sim2_config
         )
         sim2.first_name = "Adam_Smith"
         sim2.personality_description = "Curious and friendly"
@@ -63,7 +71,7 @@ class TestConversation(unittest.TestCase):
 
         # Call handle_ollama_response for sim1
         # Pass sim1 as the first argument (representing 'self')
-        handle_ollama_response(sim1, "Test response", time.time(), all_sims, city)
+        handle_ollama_response(sim1, "Test response", all_sims, city)
 
         # Assertions
         self.assertEqual(sim1.conversation_message, "Test response")
@@ -79,24 +87,30 @@ class TestConversation(unittest.TestCase):
         mock_create_tile_map.return_value = None
 
         # Create Sim instances - personalities will be loaded automatically
+        sim1_config = {
+            "character_name": "Abigail_Chen",
+            "enable_talking": True,
+            "bubble_display_time_seconds": 5.0
+        }
         sim1 = Sim(
             sim_id="sim1",
             x=10,
             y=20,
             ollama_client=self.ollama_client,
-            enable_talking=True,
-            sim_config={"character_name": "Abigail_Chen"},
-            bubble_display_time=5.0
+            sim_config=sim1_config
         )
 
+        sim2_config = {
+            "character_name": "Adam_Smith",
+            "enable_talking": True,
+            "bubble_display_time_seconds": 5.0
+        }
         sim2 = Sim(
             sim_id="sim2",
             x=30,
             y=40,
             ollama_client=self.ollama_client,
-            enable_talking=True,
-            sim_config={"character_name": "Adam_Smith"},
-            bubble_display_time=5.0
+            sim_config=sim2_config
         )
 
         # Create City instance
@@ -125,35 +139,42 @@ class TestConversation(unittest.TestCase):
         timeout = 10.0 # seconds
 
         while time.time() - start_time < timeout:
-            result = self.ollama_client.check_for_thought_results()
-            if result:
-                sim_id, response_text = result
-                print(f"Test received result for {sim_id}: {response_text}") # Debug log
-                # Find the sim instance that corresponds to the sim_id
-                sim_instance = next((s for s in all_sims if s.sim_id == sim_id), None)
-                if sim_instance:
-                     # Call the handler function from the interaction module
-                     handle_ollama_response(sim_instance, response_text, time.time(), all_sims, city)
-                     # Check if the response was for the first speaker
-                     if sim_id == first_speaker.sim_id:
-                           response_processed = True
-                           break # Exit loop once the first speaker's response is handled
+            result_data = self.ollama_client.check_for_results() # Use correct method name
+            if result_data:
+                result_type = result_data.get('type')
+                sim_id = result_data.get('sim_id')
+                response_text = result_data.get('data')
+
+                # Only process conversation results in this test
+                if result_type == 'conversation':
+                    logging.info(f"Test received conversation result for {sim_id}: {response_text}")
+                    # Find the sim instance that corresponds to the sim_id
+                    sim_instance = next((s for s in all_sims if s.sim_id == sim_id), None)
+                    if sim_instance:
+                         # Call the handler function from the interaction module (no time arg)
+                         handle_ollama_response(sim_instance, response_text, all_sims, city)
+                         # Check if the response was for the first speaker
+                         if sim_id == first_speaker.sim_id:
+                               response_processed = True
+                               break # Exit loop once the first speaker's response is handled
+                    else:
+                         logging.warning(f"Test Warning: Received result for unknown sim_id {sim_id}")
                 else:
-                     print(f"Test Warning: Received result for unknown sim_id {sim_id}")
+                     logging.debug(f"Test received non-conversation result: {result_data}")
             time.sleep(0.1) # Short sleep to avoid busy-waiting
 
         if not response_processed:
-             print(f"Test Warning: Timed out waiting for response from {first_speaker.sim_id}")
+             logging.warning(f"Test Warning: Timed out waiting for response from {first_speaker.sim_id}")
 
         # Assertions (Check the speaker who sent the request)
         self.assertIsNotNone(first_speaker.conversation_message, "Conversation message should not be None after response")
         self.assertGreater(len(first_speaker.conversation_message), 0, "Conversation message should not be empty after response")
-        print(f"Sim {first_speaker.sim_id} conversation message: {first_speaker.conversation_message}")
+        logging.info(f"Sim {first_speaker.sim_id} conversation message: {first_speaker.conversation_message}")
 
         # Assertions (Check the listener who should receive the response next turn)
         self.assertIsNotNone(second_speaker_listener.conversation_history[-1]['line'], "Conversation history should not be None after response")
         self.assertGreater(len(second_speaker_listener.conversation_history[-1]['line']), 0, "Conversation history should not be empty after response")
-        print(f"Sim {second_speaker_listener.sim_id} conversation history: {second_speaker_listener.conversation_history}")
+        logging.info(f"Sim {second_speaker_listener.sim_id} conversation history: {second_speaker_listener.conversation_history}")
 
 
 if __name__ == '__main__':

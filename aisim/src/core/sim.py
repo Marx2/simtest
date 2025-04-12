@@ -1,12 +1,12 @@
 import pygame
 import random
 import os
+import logging # Added missing import
 from typing import List, Dict, Optional
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core.interaction import _send_conversation_request # Import the function
 from aisim.src.core.interaction import check_interactions, _end_interaction
 from aisim.src.core.movement import get_coords_from_node, get_path, get_node_from_coords, movement_update
-# from aisim.src.core.text import draw_bubble # Removed - Bubble drawing handled in main loop now
 from aisim.src.core.personality import _assign_sex, load_or_generate_personality_for_sim
 from aisim.src.core.configuration import config_manager # Import the centralized config manager
 
@@ -22,7 +22,7 @@ class Sim:
         """Initializes a Sim with ID, position, Ollama client, config, and bubble display time."""
         self.sim_id = sim_id  # Store the unique ID
         self.is_interacting = False
-        self.talking_with = None # sim_id of the sim they are talking to
+        # self.talking_with = None # Replaced by conversation_partner_id
         self.sprite_sheet = None
         self.character_name, self.sprite_sheet = self._load_sprite_sheet()
         self.current_direction = 'front'
@@ -40,7 +40,7 @@ class Sim:
         self.sprite_height = sim_config.get("sprite_height", 32)
         self.interaction_distance = sim_config.get("interaction_distance", 20)
         self.sim_radius = sim_config.get("sim_radius", 5)
-        self.color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255)) # Keep random visual color distinct from fallback
+        # self.color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255)) # Unused visual color
         self.path = None
         self.path_index = 0
         self.target = None
@@ -70,7 +70,7 @@ class Sim:
         """Updates the Sim's state, following a path if available, and logs data."""
         self.tile_size = tile_size
         self.is_blocked = False # Reset blocked status
-        # print(f"Sim {self.sim_id}: update called at start, x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}, path={self.path}")
+        # logging.debug(f"Sim {self.sim_id}: update called at start, x={self.x:.2f}, y={self.y:.2f}, target={self.target}, is_interacting={self.is_interacting}, path={self.path}")
         # Call the movement update method
         movement_update(self, dt, city, weather_state, all_sims, current_time, tile_size, direction_change_frequency)
         self.animation_update(dt) # Update animation frame
@@ -87,26 +87,15 @@ class Sim:
             if not self.is_interacting:
                  return # Interaction ended, stop further processing in update
 
-        else:
-            if not self.path:
-                target_x = random.randint(0, city.grid_width - 1) * TILE_SIZE
-                target_y = random.randint(0, city.grid_height - 1) * TILE_SIZE
-                self.path = get_path((self.x, self.y), (target_x, target_y), city.graph, get_node_from_coords, get_coords_from_node, city.width, city.height)
-            if not self.path:  # Still no path (e.g., couldn't find one)
-                return
-
-        # --- Mood Update based on Weather ---
-        if weather_state in ["Rainy", "Snowy"]:
-            self.mood = max(-1.0, self.mood - 0.005 * dt)  # Slowly decrease mood in bad weather
-        elif weather_state == "Sunny":
-            self.mood = min(1.0, self.mood + 0.003 * dt)  # Slowly increase mood in good weather
+        # else: # Sim is not interacting - movement_update handles path assignment and weather mood changes
+        #    pass # No additional logic needed here if not interacting
 
         # --- Interaction Check ---
         # Pass the city object to check_interactions
         check_interactions(self, all_sims, current_time, city)
 
         # Clamp mood
-        self.mood = max(-1.0, min(self.mood, 1.0))
+        # Mood clamping is handled within movement_update
 
     def conversation_update(self, city, all_sims: List['Sim'], current_time):
         """Handles the logic for ongoing conversations."""
@@ -115,24 +104,24 @@ class Sim:
         # Check for conversation timeout (if waiting too long for a response)
         # Note: Using self.ollama_client requires ollama_client to be passed or accessible
         if self.waiting_for_ollama_response and (current_time - self.conversation_last_response_time > self.ollama_client.conversation_response_timeout):
-            print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} timed out.")
+            logging.warning(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} timed out.")
             _end_interaction(self, city, all_sims) # Assumes _end_interaction is accessible globally or imported
             return # Stop further processing within this method
 
         # Check for max turns reached
         # Note: Using self.ollama_client requires ollama_client to be passed or accessible
         if self.conversation_turns >= CONVERSATION_MAX_TURNS:
-             print(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns.")
+             logging.info(f"Sim {self.sim_id}: Conversation with {self.conversation_partner_id} reached max turns.")
              _end_interaction(self, city, all_sims) # Assumes _end_interaction is accessible
              return # Stop further processing within this method
 
         # --- Turn-Based Speaking Logic with Lock ---
         if self.is_my_turn_to_speak and not self.waiting_for_ollama_response:
-            # print(f"Sim {self.sim_id}: My turn, attempting to speak. Lock state: {city.ollama_client_locked}")
+            # logging.debug(f"Sim {self.sim_id}: My turn, attempting to speak. Lock state: {city.ollama_client_locked}")
             # Attempt to acquire the global Ollama lock
             if not city.ollama_client_locked:
                 city.ollama_client_locked = True # Acquire lock
-                print(f"Sim {self.sim_id}: Acquired Ollama lock. Preparing to send request. Turn: {self.conversation_turns}")
+                logging.info(f"Sim {self.sim_id}: Acquired Ollama lock. Preparing to send request. Turn: {self.conversation_turns}")
 
                 partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
                 if partner:
@@ -142,21 +131,20 @@ class Sim:
 
                     if not request_successful:
                         # Request failed (Ollama client error, etc.)
-                        print(f"Sim {self.sim_id}: _send_conversation_request failed. Releasing lock.")
+                        logging.warning(f"Sim {self.sim_id}: _send_conversation_request failed. Releasing lock.")
                         city.ollama_client_locked = False # Release the lock
                         # Consider ending interaction after multiple failures? For now, just log and release.
                         # Maybe add a failure counter later.
                         # _end_interaction(self, city, all_sims) # Don't end immediately, allow retry next cycle?
                 else:
                     # Partner not found, end interaction and release lock
-                    print(f"Sim {self.sim_id}: ERROR - Conversation partner {self.conversation_partner_id} not found during turn! Ending interaction.")
+                    logging.error(f"Sim {self.sim_id}: Conversation partner {self.conversation_partner_id} not found during turn! Ending interaction.")
                     city.ollama_client_locked = False # Release the lock before ending
                     _end_interaction(self, city, all_sims)
                     return # Stop processing this conversation update
 
-            # else:
-                # Lock is busy, wait for the next cycle
-                # print(f"Sim {self.sim_id}: Waiting for Ollama lock to become available.")
+            # else: # Lock is busy, wait for the next cycle
+                # logging.debug(f"Sim {self.sim_id}: Waiting for Ollama lock to become available.")
                 # Do nothing this cycle, will retry on the next update
 
 
@@ -239,12 +227,12 @@ class Sim:
        try:
            character_sprite_dir = config_manager.get_entry('sim.character_sprite_dir')
            if not character_sprite_dir or not os.path.isdir(character_sprite_dir):
-               print(f"Error: Character sprite directory not found or not configured in Sim._load_sprite_sheet: {character_sprite_dir}")
+               logging.error(f"Character sprite directory not found or not configured in Sim._load_sprite_sheet: {character_sprite_dir}")
                return "Unknown_Sim", None # Return default on error
 
            available_characters = [f for f in os.listdir(character_sprite_dir) if f.endswith('.png')]
            if not available_characters:
-               print("No character sprites found in directory:", character_sprite_dir)
+               logging.warning(f"No character sprites found in directory: {character_sprite_dir}")
                return "Unknown_Sim", None # Return default name if no sprites found
 
            chosen_sprite = random.choice(available_characters)
@@ -253,7 +241,7 @@ class Sim:
            character_name = chosen_sprite[:-4]  # Remove ".png" extension
            return character_name, sprite_sheet
        except Exception as e:
-           print(f"Error loading sprite sheet: {e}")
+           logging.error(f"Error loading sprite sheet: {e}")
            return "Unknown_Sim", None # Return a default name if loading fails
     def draw(self, screen, dt, all_sims):
         """Draws the Sim on the screen."""
@@ -270,36 +258,8 @@ class Sim:
             # Fallback: draw a colored circle
             pygame.draw.circle(screen, self.sim_color, sim_pos, self.sim_radius) # Use configured fallback color and radius
 
-        # # --- Bubble Display Logic ---
-        # Find partner if interacting
-        if self.is_interacting:
-            print(f"sim: {self.sim_id}, self.conversation_message_timer: {self.conversation_message_timer}, dt: {dt}, is_my_turn_to_speak: {self.is_my_turn_to_speak}, waiting_for_ollama_response: {self.waiting_for_ollama_response}")
-            # set partner if not set yet
-            if self.conversation_partner_id:
-                partner = self._find_sim_by_id(self.conversation_partner_id, all_sims)
-            else:
-                partner = None
-            # count down only if I have message to display
-            if self.conversation_message and self.is_my_turn_to_speak:
-                if self.conversation_message_timer <= 0:
-                    # Reset conversation message and timer
-                    self.conversation_message = None
-                    bubble_text_to_display = None
-                    self.is_my_turn_to_speak = False
-                    partner.is_my_turn_to_speak = True # Set partner's turn to speak
-                    partner.conversation_message_timer = BUBBLE_DISPLAY_TIME # Start bubble timer
-                else:
-                    # continue with existing message until timer passes
-                    bubble_text_to_display = self.conversation_message
-                    # Decrement conversation timer
-                    self.conversation_message_timer -= dt
-            else:
-                # No message to display, set to None
-                bubble_text_to_display = None
-
-            # --- Draw Bubble if text is available ---
-            # print(f"SIM {self.character_name} Should draw bubble: {bubble_text_to_display is not None}")
-            # Bubble drawing is now handled in the main loop using pygame_gui
-            pass # Keep the timer logic above, but remove the actual draw call here
+        # Bubble display logic (timer updates) is handled in the main loop (main.py)
+        # based on sim.conversation_message and sim.conversation_message_timer.
+        # The actual drawing is done via pygame_gui labels managed in main.py.
 
 

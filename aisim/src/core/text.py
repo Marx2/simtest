@@ -1,389 +1,24 @@
 import pygame
 import os
 from typing import Optional, Tuple, List, Dict, Any
-# from aisim.src.core.sim import Sim
 from aisim.src.core.configuration import config_manager
+import logging # Added for potential future use in wrap_text
 
-# Font will be initialized lazily inside draw_bubble
-# global PANEL_FONT, PANEL_EMOJI_FONT # Declare intent to modify the global variables
-PANEL_FONT = None
-PANEL_EMOJI_FONT = None
-PANEL_FONT_PATH = config_manager.get_entry('sim.panel_font_dir')
-PANEL_EMOJI_FONT_PATH = config_manager.get_entry('sim.panel_font_emoji_dir') # Added emoji font path
-HIGH_ROMANCE_THRESHOLD = config_manager.get_entry('simulation.high_romance_threshold', 0.7)
+# Note: Removed unused bubble drawing functions, font initialization,
+# and related constants as they are handled by pygame_gui in main.py.
 
-# Get colors from config with defaults
-TEXT_COLOR = tuple(config_manager.get_entry('ui.text_color', [240, 240, 240]))
-BG_COLOR = tuple(config_manager.get_entry('ui.bg_color', [50, 50, 50, 180]))
-RED_COLOR = (255, 0, 0)
-
-def initialize_fonts(font=None):
-    global PANEL_FONT, PANEL_EMOJI_FONT
-    if font is None:
-        # Initialize regular font
-        if PANEL_FONT is None:
-            try:
-                if not pygame.font.get_init(): pygame.font.init()
-                if PANEL_FONT_PATH and os.path.exists(PANEL_FONT_PATH):
-                    try:
-                        PANEL_FONT = pygame.font.Font(PANEL_FONT_PATH, 14)  # Regular text at 14px
-                        print(f"Loaded panel font: {PANEL_FONT_PATH}")
-                    except pygame.error as e:
-                        print(f"Error loading font {PANEL_FONT_PATH}: {e}")
-                        PANEL_FONT = pygame.font.SysFont(None, 14) # Fallback
-                        print("Using fallback system font.")
-                else:
-                    PANEL_FONT = pygame.font.SysFont(None, 14) # Fallback
-                    print(f"Panel font path not found or invalid: {PANEL_FONT_PATH}. Using fallback system font.")
-            except pygame.error as e:
-                 print(f"Error initializing panel font '{PANEL_FONT_PATH}': {e}")
-                 return # Cannot draw without a font
-
-        # Initialize emoji font
-        if PANEL_EMOJI_FONT is None:
-            emoji_font_size = 8 # Keep the smaller size for now
-            loaded_emoji_font = False
-            try:
-                if not pygame.font.get_init(): pygame.font.init()
-
-                # Try loading configured font path first
-                if PANEL_EMOJI_FONT_PATH and os.path.exists(PANEL_EMOJI_FONT_PATH):
-                    try:
-                        PANEL_EMOJI_FONT = pygame.font.Font(PANEL_EMOJI_FONT_PATH, emoji_font_size)
-                        print(f"Loaded configured emoji font: {PANEL_EMOJI_FONT_PATH} (size {emoji_font_size})")
-                        loaded_emoji_font = True
-                    except pygame.error as e:
-                        print(f"Error loading configured emoji font '{PANEL_EMOJI_FONT_PATH}': {e}. Trying fallback.")
-
-                # Try NotoEmoji-Regular.ttf as a fallback if configured failed or wasn't set
-                if not loaded_emoji_font:
-                    # Construct path relative to this file or use a known relative path
-                    # Assuming panel.py is in aisim/src/core/
-                    noto_path = os.path.join(os.path.dirname(__file__), '..', 'graphics', 'fonts', 'NotoEmoji-Regular.ttf')
-                    if os.path.exists(noto_path):
-                         try:
-                              PANEL_EMOJI_FONT = pygame.font.Font(noto_path, emoji_font_size)
-                              print(f"Loaded fallback NotoEmoji font: {noto_path} (size {emoji_font_size})")
-                              loaded_emoji_font = True
-                         except pygame.error as e:
-                              print(f"Error loading fallback NotoEmoji font '{noto_path}': {e}. Using main font.")
-                    else:
-                        print(f"Fallback NotoEmoji font not found at '{noto_path}'.")
-
-                # Final fallback: use the main panel font
-                if not loaded_emoji_font:
-                    print("Failed to load any specific emoji font. Using main panel font as final fallback.")
-                    PANEL_EMOJI_FONT = PANEL_FONT
-
-            except Exception as e: # Catch potential font init errors or other issues
-                 print(f"General error during emoji font initialization: {e}")
-                 PANEL_EMOJI_FONT = PANEL_FONT # Ensure fallback on any error
-
-        # Use the global default if no specific font passed in the function call
-        font = PANEL_FONT # Main font reference
-        return font
-
-def format_text(text_lines, font, emoji_font, text_color, target_emoji_height):
-    """
-    Segments text lines into regular and emoji parts, measures dimensions,
-    handles emoji scaling, and calculates overall layout metrics.
-
-    Args:
-        text_lines: List of strings, where each string is a line of text.
-        font: Pygame font object for regular text.
-        emoji_font: Pygame font object for emojis.
-        text_color: The color to use for rendering text (for measurement).
-        target_emoji_height: The desired height to scale emojis down to.
-
-    Returns:
-        A dictionary containing:
-        - 'measured_lines': A list of dictionaries, each representing a line
-                          with its segments, width, and height.
-        - 'max_measured_width': The maximum width found across all lines.
-        - 'total_content_height': The sum of the effective heights of all lines.
-    """
-    if not font or not emoji_font:
-        print("Error: Fonts not provided to format_text.")
-        # Return default structure to avoid crashes downstream
-        return {'measured_lines': [], 'max_measured_width': 0, 'total_content_height': 0}
-
-    measured_lines = []
-    max_measured_width = 0
-    base_line_height = font.get_linesize() # Use text font linesize for base height
-    total_content_height = 0
-
-    for line_text in text_lines:
-        if not line_text:
-            # Use base font line height for empty lines
-            measured_lines.append({'text': '', 'width': 0, 'height': base_line_height, 'segments': []})
-            total_content_height += base_line_height
-            continue
-
-        segments = []
-        current_segment_text = ""
-        current_is_emoji = None
-        line_width = 0
-        line_max_actual_height = 0 # Track max *rendered* height within this line
-
-        for char in line_text:
-            char_is_emoji = is_emoji(char)
-            # Determine font for the *current* character being processed
-            char_font = emoji_font if char_is_emoji else font
-
-            if not char_font: # Safety check if a font failed to load
-                print(f"Warning: Font not available for character '{char}'")
-                continue
-
-            if current_is_emoji is None: # First char
-                current_is_emoji = char_is_emoji
-                current_segment_text += char
-            elif char_is_emoji == current_is_emoji: # Continue segment
-                current_segment_text += char
-            else: # End previous segment
-                prev_font = emoji_font if current_is_emoji else font
-                if current_segment_text and prev_font: # Ensure segment and font are valid
-                    try:
-                        # Render to measure actual dimensions
-                        temp_surf = prev_font.render(current_segment_text, True, text_color)
-                        original_width = temp_surf.get_width()
-                        original_height = temp_surf.get_height()
-
-                        # --- Scale Emoji Surface if needed ---
-                        scaled_width = original_width
-                        scaled_height = original_height
-                        is_emoji_segment = current_is_emoji # Check type of segment being finalized
-
-                        if is_emoji_segment and original_height > target_emoji_height and target_emoji_height > 0:
-                            scale_factor = target_emoji_height / original_height
-                            scaled_width = int(original_width * scale_factor)
-                            scaled_height = target_emoji_height # Set to target
-                            # print(f"    Scaling emoji segment '{current_segment_text}' from H:{original_height} to H:{scaled_height} (Factor: {scale_factor:.2f})")
-
-                        # Store dimensions (potentially scaled) for layout
-                        segments.append({
-                            'text': current_segment_text,
-                            'font': prev_font,
-                            'is_emoji': is_emoji_segment, # Store if it's an emoji segment
-                            'original_width': original_width, # Store original for potential re-render
-                            'original_height': original_height,
-                            'width': scaled_width, # Use scaled width for layout
-                            'height': scaled_height # Use scaled height for layout
-                        })
-                        line_width += scaled_width # Add scaled width to line width
-                        line_max_actual_height = max(line_max_actual_height, scaled_height) # Use scaled height for max line height
-
-                    except pygame.error as e:
-                        print(f"Error measuring segment '{current_segment_text}': {e}")
-
-                # Start new segment
-                current_segment_text = char
-                current_is_emoji = char_is_emoji # Update type for the new segment
-
-        # Add the last segment
-        if current_segment_text:
-            last_font = emoji_font if current_is_emoji else font
-            if last_font:
-                try:
-                    # Render to measure actual dimensions
-                    temp_surf = last_font.render(current_segment_text, True, text_color)
-                    original_width = temp_surf.get_width()
-                    original_height = temp_surf.get_height()
-
-                    # --- Scale Emoji Surface if needed ---
-                    scaled_width = original_width
-                    scaled_height = original_height
-                    is_emoji_segment = current_is_emoji # Check type of the final segment
-
-                    if is_emoji_segment and original_height > target_emoji_height and target_emoji_height > 0:
-                        scale_factor = target_emoji_height / original_height
-                        scaled_width = int(original_width * scale_factor)
-                        scaled_height = target_emoji_height
-                        # print(f"    Scaling final emoji segment '{current_segment_text}' from H:{original_height} to H:{scaled_height} (Factor: {scale_factor:.2f})")
-
-                    # Store dimensions (potentially scaled)
-                    segments.append({
-                        'text': current_segment_text,
-                        'font': last_font,
-                        'is_emoji': is_emoji_segment,
-                        'original_width': original_width,
-                        'original_height': original_height,
-                        'width': scaled_width,
-                        'height': scaled_height
-                    })
-                    line_width += scaled_width
-                    line_max_actual_height = max(line_max_actual_height, scaled_height)
-
-                except pygame.error as e:
-                    print(f"Error measuring final segment '{current_segment_text}': {e}")
-
-        # Ensure line has at least the base height if all segments rendered shorter
-        line_effective_height = max(line_max_actual_height, base_line_height)
-
-        # Store measured data for the line using effective height
-        measured_lines.append({'text': line_text, 'width': line_width, 'height': line_effective_height, 'segments': segments})
-        max_measured_width = max(max_measured_width, line_width)
-        # Use the effective line height for total height calculation
-        total_content_height += line_effective_height
-
-    return {
-        'measured_lines': measured_lines,
-        'max_measured_width': max_measured_width,
-        'total_content_height': total_content_height
-    }
-
-# --- Helper Function ---
-def _render_bubble_surface(bubble_width: int, bubble_height: int, bg_color: Tuple[int, int, int, int]) -> Optional[pygame.Surface]:
-    """Creates the bubble background surface."""
-    try:
-        # Ensure integer dimensions and non-negative values
-        width = max(1, int(bubble_width))
-        height = max(1, int(bubble_height))
-        bubble_surface = pygame.Surface((width, height), pygame.SRCALPHA)
-        bubble_surface.fill((0, 0, 0, 0))  # Ensure transparent background
-        pygame.draw.rect(bubble_surface, bg_color, bubble_surface.get_rect(), border_radius=5)
-        return bubble_surface
-    except (pygame.error, ValueError) as e: # Catch potential errors like negative size or memory issues
-        print(f"Error creating bubble surface (width={bubble_width}, height={bubble_height}): {e}")
-        return None # Indicate failure
-
-# --- Text Rendering Helper ---
-def _render_text_on_bubble(
-    bubble_surface: pygame.Surface,
-    measured_lines: List[Dict[str, Any]],
-    bubble_width: int,
-    padding: int,
-    final_text_color: Tuple[int, int, int]
-):
-    """Renders the formatted text segments onto the bubble surface."""
-    current_y = padding
-    for line_data in measured_lines:
-        if not line_data.get('segments'):
-            current_y += line_data['height']
-            continue
-
-        start_x = max(padding, (bubble_width - line_data['width']) // 2)
-        current_x = start_x
-        line_bottom_y = current_y + line_data['height']
-
-        for segment in line_data['segments']:
-            if not segment['font']:
-                print(f"Warning: Font missing for segment '{segment['text']}'. Skipping render.")
-                continue
-            try:
-                text_surface = segment['font'].render(segment['text'], True, final_text_color)
-                blit_surface = text_surface
-                blit_width = segment['width']
-                blit_height = segment['height']
-                original_width = segment['original_width']
-                original_height = segment['original_height']
-
-                if segment['is_emoji'] and (blit_width != original_width or blit_height != original_height):
-                    try:
-                        blit_surface = pygame.transform.smoothscale(text_surface, (blit_width, blit_height))
-                    except (ValueError, pygame.error) as scale_err:
-                        print(f"Error scaling surface for '{segment['text']}': {scale_err}. Using original.")
-                        blit_surface = text_surface
-                        blit_width = original_width
-                        blit_height = original_height
-
-                segment_rect = blit_surface.get_rect(left=int(current_x), bottom=int(line_bottom_y))
-                bubble_surface.blit(blit_surface, segment_rect)
-                current_x += blit_width
-
-            except pygame.error as e:
-                print(f"Error rendering segment '{segment['text']}' with font {segment['font']}: {e}")
-            except AttributeError:
-                print(f"Error: Font object invalid for segment '{segment['text']}'. Font: {segment['font']}")
-
-        current_y = line_bottom_y
-
-# --- Main Function ---
-def draw_bubble(screen, text, position, font=None, text_color=TEXT_COLOR, bg_color=BG_COLOR, max_width=150, padding=10, offset_y=-30, sim1: Optional['Sim'] = None, sim2: Optional['Sim'] = None):
-    """Draws a text bubble above a given position."""
-
-    font = initialize_fonts(font) # Initialize fonts if not already done
-    if not text or not font or not PANEL_EMOJI_FONT: # Also check if fonts initialized
-        return
-
-    # Determine text color based on romance level if sims are provided
-    final_text_color = text_color # Start with default
-    if sim1 and sim2:
-        # Check relationship from sim1's perspective (the owner of the bubble)
-        relation_to_sim2 = sim1.relationships.get(sim2.sim_id)
-        if relation_to_sim2 and relation_to_sim2.get("romance", 0.0) >= HIGH_ROMANCE_THRESHOLD:
-            final_text_color = RED_COLOR # Red color for high romance
-
-    # Wrap text first
-    lines = wrap_text_compact(text, font, max_width)
-    if not lines: # Don't draw if wrapping results in no lines
-        return
-
-    # --- Format and Measure Text ---
-    target_emoji_height = font.get_linesize() # Use main font line size as target
-    formatted_data = format_text(lines, font, PANEL_EMOJI_FONT, final_text_color, target_emoji_height)
-
-    measured_lines = formatted_data['measured_lines']
-    max_measured_width = formatted_data['max_measured_width']
-    total_content_height = formatted_data['total_content_height']
-
-    if not measured_lines: # Don't draw if formatting resulted in nothing
-        return
-
-
-    # --- Bubble Dimension Calculation Phase ---
-    bubble_width = max_measured_width + (2 * padding)
-    # Bubble height now based on sum of effective heights per line
-    bubble_height = total_content_height + (2 * padding)
-    # Bubble position calculation remains the same
-    bubble_x = position[0] - bubble_width // 2
-    bubble_y = position[1] + offset_y - bubble_height # Position above the target point
-    if bubble_y < 0:
-        bubble_y = 0
-
-    # --- Bubble Render Phase (Using Helper) ---
-    bubble_surface = _render_bubble_surface(bubble_width, bubble_height, bg_color)
-    if bubble_surface is None:
-         return # Cannot proceed if surface creation fails
-
-    # --- Text Render Phase (Using Helper) ---
-    _render_text_on_bubble(
-        bubble_surface,
-        measured_lines,
-        bubble_width,
-        padding,
-        final_text_color
-    )
-
-    # Blit the complete bubble surface onto the main screen
-    screen.blit(bubble_surface, (int(bubble_x), int(bubble_y))) # Ensure integer coordinates
-
-def is_emoji(char):
-    """Returns True if the character is likely an emoji."""
-    # Using a simple codepoint range check is often sufficient and avoids
-    # dependency on unicodedata if not available or needed elsewhere.
-    # More comprehensive checks can be added if required.
-    codepoint = ord(char)
-    # Basic Multilingual Plane Supplement + Supplementary Multilingual Plane (covers many emojis)
-    is_bmp_emoji = (
-        (0x2600 <= codepoint <= 0x27BF) or  # Miscellaneous Symbols
-        (0x1F300 <= codepoint <= 0x1F5FF) or  # Misc Symbols and Pictographs
-        (0x1F600 <= codepoint <= 0x1F64F) or  # Emoticons
-        (0x1F680 <= codepoint <= 0x1F6FF) or  # Transport and Map
-        (0x1FA70 <= codepoint <= 0x1FAFF)     # Symbols and Pictographs Extended-A
-    )
-    # Check for specific characters if needed, e.g., variation selectors
-    is_variation_selector = (0xFE00 <= codepoint <= 0xFE0F)
-
-    # More complex checks involving specific ranges or properties can be added.
-    # This basic check covers a wide range of common emojis.
-    # Consider adding checks for ZWJ sequences or flags if needed later.
-    return is_bmp_emoji # Ignoring variation selectors for basic check
 def wrap_text(text, font, max_width):
-    """Wraps text to fit within a specified width."""
+    """Wraps text to fit within a specified width, preserving paragraphs."""
     lines = []
     # Handle potential None or empty text
     if not text:
-        return [""]
+        return [""] # Return a list with an empty string for consistency
+
+    if not font:
+        logging.error("wrap_text called with no font provided.")
+        # Cannot wrap without a font, return original text split by newlines
+        return text.split('\n')
+
     # Split into paragraphs first to preserve line breaks
     paragraphs = text.split('\n')
     for paragraph in paragraphs:
@@ -391,63 +26,52 @@ def wrap_text(text, font, max_width):
         current_line = []
         while words:
             word = words.pop(0)
+            # Handle empty words resulting from multiple spaces
+            if not word:
+                continue
+
             test_line = ' '.join(current_line + [word])
-            # Check if the line fits
-            if font.size(test_line)[0] <= max_width:
-                current_line.append(word)
-            # If the line doesn't fit AND it's not the only word
-            elif current_line:
-                lines.append(' '.join(current_line))
-                current_line = [word] # Start new line with the word that didn't fit
-            # If the line doesn't fit and it IS the only word (word is too long)
-            else:
-                # Simple character-based wrap for overly long words
-                temp_word = ""
-                for char in word:
-                    if font.size(temp_word + char)[0] <= max_width:
-                        temp_word += char
-                    else:
+            try:
+                # Check if the line fits
+                if font.size(test_line)[0] <= max_width:
+                    current_line.append(word)
+                # If the line doesn't fit AND it's not the only word
+                elif current_line:
+                    lines.append(' '.join(current_line))
+                    current_line = [word] # Start new line with the word that didn't fit
+                # If the line doesn't fit and it IS the only word (word is too long)
+                else:
+                    # Simple character-based wrap for overly long words
+                    temp_word = ""
+                    for char_index, char in enumerate(word):
+                        if font.size(temp_word + char)[0] <= max_width:
+                            temp_word += char
+                        else:
+                            # If even the first character doesn't fit, add it anyway
+                            if char_index == 0:
+                                lines.append(char)
+                                temp_word = "" # Reset for next char
+                            else:
+                                lines.append(temp_word)
+                                temp_word = char # Start new line part with current char
+                    if temp_word: # Add the remainder of the long word
                         lines.append(temp_word)
-                        temp_word = char
-                if temp_word: # Add the remainder of the long word
-                    lines.append(temp_word)
-                current_line = [] # Reset current line after handling long word
+                    current_line = [] # Reset current line after handling long word
+            except pygame.error as e:
+                 logging.error(f"Pygame error during text wrapping: {e}. Text: '{test_line}'")
+                 # Fallback: add the word that caused the error as a new line
+                 if current_line: # Add previous line if any
+                     lines.append(' '.join(current_line))
+                 lines.append(word) # Add the problematic word
+                 current_line = [] # Reset
+
         # Add the last line of the paragraph if it has content
         if current_line:
             lines.append(' '.join(current_line))
-        # Add an empty line between paragraphs if the original text had one
-    # Ensure at least one line is returned if text was just whitespace
+
+    # Ensure at least one line is returned if text was just whitespace or empty
     if not lines and text.strip() == "":
         return [""]
-    elif not lines: # If text was non-empty but resulted in no lines somehow
-        return [text] # Return original text as a single line
-    return lines
-
-def wrap_text_compact(text, font, max_width):
-    """Helper function to wrap text to fit within a specified width."""
-    words = text.split(' ')
-    lines = []
-    current_line = []
-
-    for word in words:
-        test_line = ' '.join(current_line + [word])
-        # Use font.size to check width
-        if font.size(test_line)[0] <= max_width:
-            current_line.append(word)
-        else:
-            # Only add non-empty lines
-            if current_line:
-                lines.append(' '.join(current_line))
-            # Handle very long words that exceed max_width alone
-            if font.size(word)[0] > max_width:
-                 # Simple split (might break words awkwardly) - consider more robust hyphenation
-                 # For now, just add the long word as its own line
-                 lines.append(word)
-                 current_line = []
-            else:
-                 current_line = [word]
-
-
-    if current_line:
-        lines.append(' '.join(current_line))
+    elif not lines: # If text was non-empty but resulted in no lines somehow (e.g., error)
+        return [text] # Return original text as a single line as fallback
     return lines

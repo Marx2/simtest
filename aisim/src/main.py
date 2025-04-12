@@ -1,7 +1,6 @@
 import pygame
 import os
 import sys
-import sys
 import random
 import uuid
 import os
@@ -12,10 +11,9 @@ from aisim.src.core.weather import Weather
 from aisim.src.core.city import City, TILE_SIZE # Import TILE_SIZE constant
 from aisim.src.ai.ollama_client import OllamaClient
 from aisim.src.core import interaction
-# from aisim.src.core.panel import draw_panel_details # Removed - Handled by pygame_gui
-# from aisim.src.core.text import draw_bubble # Removed - Bubble logic will be handled differently or removed
-from aisim.src.core.mood import get_mood_description # Needed for Sim details window
-
+from aisim.src.core.mood import get_mood_description # Needed for Sim details window (in panel.py)
+from aisim.src.ui.panel import create_or_focus_sim_details_window # Import the moved function
+from aisim.src.ui.bubble import manage_conversation_bubbles # Import the moved function
 print(f"Current working directory: {os.getcwd()}")
 print(f"Python sys.path: {sys.path}")
 SCREEN_WIDTH = config_manager.get_entry('simulation.screen_width', 800) # Default width
@@ -25,102 +23,7 @@ WINDOW_TITLE = config_manager.get_entry('simulation.window_title', "AI Simulatio
 # Dictionary to store active Sim detail windows {sim_id: UIWindow}
 active_detail_windows = {} # {sim_id: UIWindow}
 active_bubble_labels = {} # {sim_id: UILabel}
-
-def create_or_focus_sim_details_window(sim, manager, sims_dict):
-    """Creates a new Sim detail window or focuses an existing one."""
-    global active_detail_windows
-    window_object_id = f"#sim_window_{sim.sim_id}"
-
-    # Check if window already exists
-    existing_window = None
-    # Need a reliable way to find the window by object ID if manager allows it,
-    # otherwise iterate through tracked windows. Let's use our tracking dict.
-    if sim.sim_id in active_detail_windows:
-         existing_window = active_detail_windows[sim.sim_id]
-         # Check if the window actually still exists in the UI manager
-         # (Could have been closed unexpectedly - though our close handler should prevent this)
-         # A more robust check might involve querying the manager, but this is simpler for now.
-         if existing_window:
-             existing_window.focus() # Bring to front
-             print(f"Focused existing window for {sim.full_name}")
-             return # Don't create a new one
-
-    # --- Create New Window ---
-    print(f"Creating new window for {sim.full_name}")
-    window_width = 450
-    window_height = 450
-    # Center the window initially
-    window_x = (SCREEN_WIDTH - window_width) // 2
-    window_y = (SCREEN_HEIGHT - window_height) // 2
-    window_rect = pygame.Rect(window_x, window_y, window_width, window_height)
-
-    # --- Format Content as HTML ---
-    # Portrait (if available) - Requires image loading and embedding, complex for basic HTML.
-    # Let's skip the portrait image in the text box for now. A dedicated image element might be better.
-    # portrait_html = f'<img src="file://{sim.sprite_path}" width="64" height="64"><br>' if sim.sprite_path else "" # File path might not work directly
-
-    mood_str = get_mood_description(sim.mood)
-    basic_info = (
-        f"<b>Name:</b> {sim.full_name}<br>"
-        f"<b>ID:</b> {sim.sim_id[:8]}...<br>"
-        f"<b>Sex:</b> {sim.sex}<br>"
-        f"<b>Mood:</b> {mood_str} ({sim.mood:.2f})<br>"
-        f"<b>Position:</b> ({sim.x:.1f}, {sim.y:.1f})<br>"
-        f"<b>Tile:</b> {sim.current_tile}<br><br>"
-    )
-
-    personality_html = sim.personality_description.replace('\n', '<br>')
-    personality_info = f"<b>Personality:</b><br>{personality_html}<br><br>"
-
-    romance_info = "<b>Romance:</b><br>"
-    if sim.relationships:
-        sorted_relationships = sorted(sim.relationships.items(), key=lambda item: item[1].get('romance', 0.0), reverse=True)
-        for other_id, values in sorted_relationships:
-            other_sim = sims_dict.get(other_id)
-            other_name = other_sim.full_name if other_sim else f"Unknown ({other_id[:6]})"
-            friendship = values.get('friendship', 0.0)
-            romance = values.get('romance', 0.0)
-            romance_info += f"- {other_name}: F={friendship:.1f}, R={romance:.1f}<br>"
-    else:
-        romance_info += "- None<br>"
-    romance_info += "<br>" # Add space after section
-
-    conversation_history = "<b>Conversation History:</b><br>"
-    if sim.conversation_history:
-        for entry in sim.conversation_history:
-            speaker = entry.get('speaker', 'Unknown')
-            line = entry.get('line', '')
-            # Basic HTML escaping (replace < and >) - more robust escaping might be needed
-            line_escaped = line.replace('<', '&lt;').replace('>', '&gt;')
-            conversation_history += f"<i>{speaker}:</i> {line_escaped}<br>"
-    else:
-        conversation_history += "- None<br>"
-
-    full_html_content = basic_info + personality_info + romance_info + conversation_history
-
-    # Create the window
-    new_window = pygame_gui.elements.UIWindow(
-        rect=window_rect,
-        manager=manager,
-        window_display_title=f"Details: {sim.full_name}",
-        object_id=pygame_gui.core.ObjectID(object_id=window_object_id, class_id="@sim_details_window") # Use ObjectID
-    )
-
-    # Create the text box inside the window
-    # Make the text box slightly smaller than the window's client area
-    text_box_rect = pygame.Rect(0, 0, window_width - 30, window_height - 60) # Adjust padding as needed
-    text_box_rect.center = (window_width // 2, window_height // 2 - 10) # Center within window approx
-
-    pygame_gui.elements.UITextBox(
-        relative_rect=text_box_rect,
-        html_text=full_html_content,
-        manager=manager,
-        container=new_window, # Place inside the window
-        anchors={'left': 'left', 'right': 'right', 'top': 'top', 'bottom': 'bottom'} # Anchor to window edges
-    )
-
-    # Track the new window
-    active_detail_windows[sim.sim_id] = new_window
+# Function create_or_focus_sim_details_window moved to aisim.src.ui.panel
 
 def main():
     # Get config values using the centralized manager
@@ -200,12 +103,9 @@ def main():
     current_sim_time = 0.0 # Track total simulation time passed
     selected_sim = None # Track the currently selected Sim (for bottom label)
     selected_tile_info = None # Track the last clicked tile info
-    # detailed_sim = None # Removed - Replaced by active_detail_windows tracking
     last_click_time = 0
     last_clicked_sim_id = None
     DOUBLE_CLICK_TIME = 500 # Milliseconds
-    # panel_scroll_offset = 0 # Removed - Handled by pygame_gui
-    # show_test_bubble = False # Removed - Test bubble feature removed
     while running:
         # Event handling
         time_delta = clock.tick(fps) / 1000.0 # Calculate time_delta here for UIManager
@@ -220,7 +120,6 @@ def main():
                 elif event.key in time_scales: # Change speed
                      time_scale = time_scales[event.key]
                      print(f"Time scale set to: {time_scale}x")
-                # Removed 'E' key binding for test bubble
             # --- Mouse Button Down Logic (Refactored for GUI) ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
                  if event.button == 1: # Left click
@@ -252,8 +151,10 @@ def main():
                         time_since_last_click = current_time_ms - last_click_time
                         if clicked_on_sim_object.sim_id == last_clicked_sim_id and time_since_last_click < DOUBLE_CLICK_TIME:
                             print(f"Double-clicked Sim: {clicked_on_sim_object.sim_id}")
-                            # --- Action: Create or Focus Sim Details Window ---
-                            create_or_focus_sim_details_window(clicked_on_sim_object, ui_manager, sims_dict) # New function needed
+                            # --- Action: Create or Focus Sim Details Window (Call moved function) ---
+                            create_or_focus_sim_details_window(
+                                clicked_on_sim_object, ui_manager, sims_dict, active_detail_windows, SCREEN_WIDTH, SCREEN_HEIGHT
+                            )
                             selected_sim = clicked_on_sim_object # Keep track for bottom label
                             selected_tile_info = None
                             # Reset double-click tracking
@@ -312,9 +213,7 @@ def main():
             # elif event.type == pygame_gui.UI_BUTTON_PRESSED:
             #     if event.ui_element == some_button:
             #         print("Button pressed!")
-            # Removed MOUSEWHEEL handling for panel - pygame_gui handles scrolling
         # Calculate delta time (time since last frame) - Moved before event loop
-        # raw_dt = clock.tick(fps) / 1000.0 # Get raw delta time
 
         # Apply time controls
         # dt is the time passed since the last frame (the smallest time unit) scaled by time_scale
@@ -400,7 +299,6 @@ def main():
                     if sim1_id and sim2_id:
                         analysis_pair = tuple(sorted((sim1_id, sim2_id)))
                         city.pending_romance_analysis.discard(analysis_pair)
-                        # print(f"Removed {analysis_pair} from pending romance analysis.") # Debug
 
                 else:
                     print(f"Warning: Received unknown result type from Ollama queue: {result_type}")
@@ -425,7 +323,6 @@ def main():
 
         # Bottom Info Label
         if selected_sim:
-             # No log display here anymore, just basic info
              bottom_info_label.set_text(f"Selected: {selected_sim.full_name} (Mood: {selected_sim.mood:.2f})")
         elif selected_tile_info:
              coords = selected_tile_info['coords']
@@ -448,63 +345,8 @@ def main():
             sim.draw(screen, dt, all_sims_list)
         weather.draw_effects(screen) # Draw weather effects over sims
 
-        # --- Manage and Position Conversation Bubbles ---
-        sim_ids_with_active_bubbles = set() # Track sims that *should* have a bubble this frame
-        for sim_id, sim in sims_dict.items():
-            bubble_text = sim.conversation_message
-            bubble_timer = sim.conversation_message_timer
-
-            if bubble_text and bubble_timer > 0:
-                sim_ids_with_active_bubbles.add(sim_id)
-                sim_pos = (int(sim.x), int(sim.y))
-                bubble_anchor_y = sim_pos[1] - sim.sprite_height // 2 - 5 # Position above sprite
-
-                if sim_id in active_bubble_labels:
-                    # --- Update Existing Bubble ---
-                    bubble_label = active_bubble_labels[sim_id]
-                    if bubble_label.text != bubble_text: # Update text if it changed
-                         bubble_label.set_text(bubble_text)
-                    # Recalculate position based on current sim location and potential text change
-                    # We need to estimate width based on text to center it roughly
-                    # This is imperfect as label size adjusts after manager update.
-                    # A fixed width or using a different element might be better for precise centering.
-                    estimated_width = len(bubble_text) * 8 # Rough estimate
-                    bubble_rect = pygame.Rect(0, 0, estimated_width, 30) # Temp rect for positioning
-                    bubble_rect.midbottom = (sim_pos[0], bubble_anchor_y)
-                    bubble_label.set_relative_position(bubble_rect.topleft)
-                    bubble_label.show() # Ensure it's visible
-
-                else:
-                    # --- Create New Bubble ---
-                    print(f"Creating bubble for {sim.full_name}: {bubble_text}")
-                    # Estimate initial size and position
-                    estimated_width = len(bubble_text) * 8 + 20 # Add padding estimate
-                    estimated_height = 30 # Fixed height guess for label
-                    bubble_rect = pygame.Rect(0, 0, estimated_width, estimated_height)
-                    bubble_rect.midbottom = (sim_pos[0], bubble_anchor_y)
-
-                    # Create the label
-                    bubble_label = pygame_gui.elements.UILabel(
-                        relative_rect=bubble_rect,
-                        text=bubble_text,
-                        manager=ui_manager,
-                        object_id=f"#sim_bubble_{sim_id}" # Unique ID
-                        # Consider adding a class_id like '@sim_bubble' for styling
-                    )
-                    active_bubble_labels[sim_id] = bubble_label
-            # else: Bubble should not be shown for this sim
-
-        # --- Clean up expired / unused bubbles ---
-        sim_ids_to_remove = []
-        for sim_id, bubble_label in active_bubble_labels.items():
-            if sim_id not in sim_ids_with_active_bubbles:
-                print(f"Killing bubble for Sim ID {sim_id}")
-                bubble_label.kill()
-                sim_ids_to_remove.append(sim_id)
-
-        for sim_id in sim_ids_to_remove:
-            del active_bubble_labels[sim_id]
-        # --- End Conversation Bubble Management ---
+        # --- Manage Conversation Bubbles (Call moved function) ---
+        manage_conversation_bubbles(sims_dict, active_bubble_labels, ui_manager)
 
 
         # --- Draw UI Elements using Pygame GUI ---

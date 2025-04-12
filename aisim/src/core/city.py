@@ -127,13 +127,15 @@ class City:
            prioritizing grass sprites from the dedicated grass definition file."""
         self.tile_map = [[None for _ in range(self.grid_width)] for _ in range(self.grid_height)]
 
-        # Get lists of sprite names by type
-        # Use the dedicated grass definitions for grass selection
-        grass_sprites = [s['name'] for s in self.grass_sprite_definitions if s.get('name')]
-        # Use the combined list (all_definitions) filtered for other types
-        path_sprites = [s['name'] for s in self.sprite_definitions if s.get('name', '').startswith('path_')]
-        water_sprites = [s['name'] for s in self.sprite_definitions if s.get('name', '').startswith('water_')]
-        prop_sprites = [s['name'] for s in self.sprite_definitions if s.get('name', '').startswith(('tree_', 'bush_', 'barrel', 'fence_', 'signpost_'))]
+        # Get lists of sprite names by type using the combined definitions
+        def get_sprites_starting_with(prefixes):
+            if isinstance(prefixes, str): prefixes = (prefixes,)
+            return [s['name'] for s in self.sprite_definitions if s.get('name', '').startswith(prefixes)]
+
+        grass_sprites = [s['name'] for s in self.grass_sprite_definitions if s.get('name')] # Keep separate grass list for base filling
+        path_sprites = get_sprites_starting_with('path_')
+        water_sprites = get_sprites_starting_with('water_')
+        prop_sprites = get_sprites_starting_with(('tree_', 'bush_', 'barrel', 'fence_', 'signpost_'))
 
         if not grass_sprites:
              print("Error: No grass sprites found in the dedicated grass definitions. Cannot generate map.")
@@ -186,7 +188,7 @@ class City:
                 # Avoid overwriting the pond and horizontal path
                 if self.tile_map[r][v_path_col] is None or self.tile_map[r][v_path_col].startswith('grass_'):
                     self.tile_map[r][v_path_col] = v_path_sprite
-            # TODO: Add intersection tile if available
+            # Note: Intersection tile logic could be added here if needed.
 
         # 4. Add random props
         num_props = 50
@@ -204,17 +206,7 @@ class City:
                 r = random.randint(0, self.grid_height - prop_h_tiles)
                 c = random.randint(0, self.grid_width - prop_w_tiles)
 
-                # Check if area is suitable (e.g., grass) and clear
-                can_place = True
-                for ro in range(prop_h_tiles):
-                    for co in range(prop_w_tiles):
-                         if not (0 <= r + ro < self.grid_height and 0 <= c + co < self.grid_width):
-                              can_place = False; break
-                         tile = self.tile_map[r + ro][c + co]
-                         if tile is None or tile.startswith(('path_', 'water_')) or \
-                            (tile.startswith('prop_') and (ro > 0 or co > 0)): # Check if another prop occupies non-top-left
-                             can_place = False; break
-                    if not can_place: break
+                can_place = self._is_placement_valid(r, c, prop_h_tiles, prop_w_tiles)
 
                 if can_place:
                     # Place prop name at top-left
@@ -228,6 +220,23 @@ class City:
                 attempts += 1
 
         print("Tile map created with new sprite logic.")
+
+    def _is_placement_valid(self, r_start, c_start, height_tiles, width_tiles):
+        """Checks if a multi-tile object can be placed at the given location."""
+        for r_offset in range(height_tiles):
+            for c_offset in range(width_tiles):
+                r, c = r_start + r_offset, c_start + c_offset
+                # Check bounds
+                if not (0 <= r < self.grid_height and 0 <= c < self.grid_width):
+                    return False
+                # Check tile content
+                tile = self.tile_map[r][c]
+                # Cannot place if tile is None (covered by large sprite), path, water,
+                # or another prop's non-origin tile.
+                if tile is None or tile.startswith(('path_', 'water_')) or \
+                   (tile.startswith('prop_') and (r_offset > 0 or c_offset > 0)):
+                    return False
+        return True
 
 
     def city_update(self, dt):
@@ -290,50 +299,43 @@ class City:
             return
 
         # --- Draw Tiles using Sprite Definitions ---
-        # Get a default grass sprite (from the dedicated list) for layering under props
+        # Get a default grass sprite (from the dedicated list) for layering
         default_grass_name = next((s['name'] for s in self.grass_sprite_definitions if s.get('name')), None)
+        default_grass_def = self.sprite_lookup.get(default_grass_name) if default_grass_name else None
+        default_grass_img = self.source_images.get(default_grass_def['source_file']) if default_grass_def else None
+        default_grass_rect = pygame.Rect(default_grass_def['x'], default_grass_def['y'], default_grass_def['width'], default_grass_def['height']) if default_grass_def else None
 
         for r in range(self.grid_height):
             for c in range(self.grid_width):
                 tile_name = self.tile_map[r][c]
                 dest_pos = (c * TILE_SIZE, r * TILE_SIZE)
 
-                # Determine if the current tile is occupied by a larger sprite originating from top-left
-                # If tile_name is None, it might be covered. Need a way to know what covers it to draw base?
-                # For now, if None, draw default grass. If _create_tile_map clears correctly, this is okay.
-                if tile_name is None:
-                    if default_grass_name and default_grass_name in self.sprite_lookup:
-                         sprite_def = self.sprite_lookup[default_grass_name]
-                         if sprite_def['source_file'] in self.source_images:
-                            source_img = self.source_images[sprite_def['source_file']]
-                            source_rect = pygame.Rect(sprite_def['x'], sprite_def['y'], sprite_def['width'], sprite_def['height'])
-                            screen.blit(source_img, dest_pos, area=source_rect)
-                    else:
-                         pygame.draw.rect(screen, self.grid_color, (*dest_pos, TILE_SIZE, TILE_SIZE))
-                    continue # Move to next cell
+                # --- Draw Base Layer (usually default grass) ---
+                # Draw default grass if the tile is None (covered) or if it's a prop
+                is_prop = tile_name and tile_name.startswith(('tree_', 'bush_', 'barrel', 'fence_', 'signpost_'))
+                should_draw_base = (tile_name is None or is_prop)
 
-                # If tile has a name, draw it
+                if should_draw_base:
+                    if default_grass_img and default_grass_rect and default_grass_rect.size == (TILE_SIZE, TILE_SIZE):
+                        screen.blit(default_grass_img, dest_pos, area=default_grass_rect)
+                    else:
+                        # Fallback if default grass isn't available/valid
+                        pygame.draw.rect(screen, self.grid_color, (*dest_pos, TILE_SIZE, TILE_SIZE))
+
+                # If the tile was covered (None), we've drawn the base, so continue
+                if tile_name is None:
+                    continue
+
+                # --- Draw Top Layer (Specific Tile/Prop) ---
+                # If tile has a name, draw its specific sprite
                 if tile_name in self.sprite_lookup:
                     sprite_def = self.sprite_lookup[tile_name]
-                    source_file = sprite_def['source_file']
+                    source_file = sprite_def.get('source_file')
 
-                    if source_file in self.source_images:
+                    if source_file and source_file in self.source_images:
                         source_img = self.source_images[source_file]
                         source_rect = pygame.Rect(sprite_def['x'], sprite_def['y'], sprite_def['width'], sprite_def['height'])
-
-                        # Layering: If it's a prop, draw default grass underneath first
-                        is_prop = sprite_def['name'].startswith(('tree_', 'bush_', 'barrel', 'fence_', 'signpost_'))
-                        if is_prop:
-                            if default_grass_name and default_grass_name in self.sprite_lookup:
-                                base_def = self.sprite_lookup[default_grass_name]
-                                if base_def['source_file'] in self.source_images:
-                                    base_img = self.source_images[base_def['source_file']]
-                                    base_rect = pygame.Rect(base_def['x'], base_def['y'], base_def['width'], base_def['height'])
-                                    # Ensure base tile is 32x32 for standard grid cell
-                                    if base_rect.width == TILE_SIZE and base_rect.height == TILE_SIZE:
-                                       screen.blit(base_img, dest_pos, area=base_rect)
-
-                        # Draw the actual sprite (prop, path, water, grass variant)
+                        # Draw the actual sprite (prop, path, water, grass variant, etc.)
                         screen.blit(source_img, dest_pos, area=source_rect)
                     else:
                         # Source image missing
@@ -358,5 +360,4 @@ class City:
                     # Position text slightly inside the top-left corner
                     screen.blit(text_surf, (rect.x + 2, rect.y + 2))
 
-        # TODO: Load and draw actual building sprites based on a building map layer.
-        # The current logic only draws grass, paths, and props.
+        # Note: Building sprites would need to be loaded and drawn, potentially using a separate layer or modifying the tile_map logic.

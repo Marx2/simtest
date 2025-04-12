@@ -1,10 +1,9 @@
 import random
 import pygame
-
+import logging # Added missing import
 class Weather:
     """Manages the simulation's weather system."""
 
-    # TRANSITION_TIME = 10.0 # Removed, now loaded from config
 
     def __init__(self, config_manager, screen_width, screen_height):
         """Initializes the weather system using simulation config."""
@@ -38,7 +37,7 @@ class Weather:
         self.is_transitioning = False
         self.transition_timer = 0.0
 
-        print(f"Initial weather: {self.current_state} (Changes possible every {self.change_frequency}s, transition: {self.transition_duration}s)")
+        logging.info(f"Initial weather: {self.current_state} (Changes possible every {self.change_frequency}s, transition: {self.transition_duration}s)")
 
     def weather_update(self, dt):
         """Updates the weather state based on time and manages effects."""
@@ -57,7 +56,7 @@ class Weather:
             if not possible_new_states: # Handle case where there's only one state
                 possible_new_states = self.states
             self.current_state = random.choice(possible_new_states)
-            print(f"Weather changed from {old_state} to {self.current_state}")  # Log change
+            logging.info(f"Weather changed from {old_state} to {self.current_state}")  # Log change
             # Start transition effect
             self.is_transitioning = True
             self.transition_timer = self.transition_duration
@@ -82,13 +81,12 @@ class Weather:
     def _effects_update(self, dt):
         """Updates the state of ongoing effects like rain."""
         if self.current_state == "Rainy":
-            # Add new raindrops
-            if len(self.raindrops) < self.max_raindrops:
-                for _ in range(5): # Add a few drops per frame
-                     if len(self.raindrops) < self.max_raindrops:
-                        x = random.randint(0, self.screen_width)
-                        y = random.randint(-self.screen_height // 2, 0) # Start off-screen top
-                        self.raindrops.append([x, y])
+            # Add new raindrops if below max
+            num_to_add = max(0, self.max_raindrops - len(self.raindrops))
+            for _ in range(min(num_to_add, 5)): # Add up to 5 new drops per frame, respecting max
+                x = random.randint(0, self.screen_width)
+                y = random.randint(-self.screen_height // 2, 0) # Start off-screen top
+                self.raindrops.append([x, y])
 
             # Move raindrops
             rain_speed = 300 * dt # Pixels per second
@@ -102,14 +100,13 @@ class Weather:
             self.raindrops = [] # Clear raindrops if not raining
 
         if self.current_state == "Snowy":
-             # Add new snowflakes
-            if len(self.snowflakes) < self.max_snowflakes:
-                for _ in range(2): # Add fewer flakes per frame than rain
-                     if len(self.snowflakes) < self.max_snowflakes:
-                        x = random.randint(0, self.screen_width)
-                        y = random.randint(-self.screen_height // 4, 0) # Start off-screen top
-                        size = random.randint(2, 5) # Varying snowflake sizes
-                        self.snowflakes.append([x, y, size])
+            # Add new snowflakes if below max
+            num_to_add = max(0, self.max_snowflakes - len(self.snowflakes))
+            for _ in range(min(num_to_add, 2)): # Add up to 2 new flakes per frame, respecting max
+                x = random.randint(0, self.screen_width)
+                y = random.randint(-self.screen_height // 4, 0) # Start off-screen top
+                size = random.randint(2, 5) # Varying snowflake sizes
+                self.snowflakes.append([x, y, size])
 
             # Move snowflakes (slower than rain, with drift)
             snow_speed = 80 * dt # Pixels per second (slower)

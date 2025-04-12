@@ -92,18 +92,3 @@ class ConfigManager:
 
 # Create a single, shared instance of the ConfigManager
 config_manager = ConfigManager()
-
-# Example Usage (can be removed or kept for testing)
-if __name__ == '__main__':
-    print(f"Attempting to load config from: {CONFIG_PATH}")
-    print(f"Loaded config data: {config_manager._config_data}") # Access internal for demo
-
-    # Test cases
-    print("\n--- Testing get_entry ---")
-    print(f"simulation.fps: {config_manager.get_entry('simulation.fps', 0)}")
-    print(f"ollama.model: {config_manager.get_entry('ollama.model', 'default_model')}")
-    print(f"city.grid_color: {config_manager.get_entry('city.grid_color', [0,0,0])}")
-    print(f"nonexistent.key: {config_manager.get_entry('nonexistent.key', 'Not Found')}")
-    print(f"simulation.invalid.path: {config_manager.get_entry('simulation.invalid.path', 'Invalid Path')}")
-    print(f"Using list key ['sim', 'female_names']: {config_manager.get_entry(['sim', 'female_names'], [])}")
-    print(f"Using list key ['sim', 'nonexistent']: {config_manager.get_entry(['sim', 'nonexistent'], 'List Key Not Found')}")
