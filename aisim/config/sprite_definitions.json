@@ -95,6 +95,51 @@
     "x": 160, "y": 128, "width": 32, "height": 128, "can_be_rotated": false
   },
   {
+    "name": "path_dirt_corner_ne",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_corner_se",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_corner_sw",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_corner_nw",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_t_nse",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_t_nsw",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_t_sew",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_t_new",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
+    "name": "path_dirt_cross_nsew",
+    "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
+    "x": 64, "y": 0, "width": 32, "height": 32, "can_be_rotated": false
+  },
+  {
     "name": "tree_pine",
     "source_file": "aisim/src/graphics/v3/tileset-grassland-props.png",
     "x": 0, "y": 0, "width": 64, "height": 64, "can_be_rotated": false

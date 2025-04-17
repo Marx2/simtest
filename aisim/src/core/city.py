@@ -171,24 +171,8 @@ class City:
                         if r_start + r_offset < self.grid_height and c_start + c_offset < self.grid_width:
                              self.tile_map[r_start + r_offset][c_start + c_offset] = None # Indicate covered by large sprite
 
-        # 3. Add simple paths (example: horizontal and vertical crossing)
-        h_path_row = self.grid_height // 3
-        v_path_col = self.grid_width // 2
-        h_path_sprite = 'path_dirt_h_straight' if 'path_dirt_h_straight' in self.sprite_lookup else None
-        v_path_sprite = 'path_dirt_v_straight' if 'path_dirt_v_straight' in self.sprite_lookup else None
-
-        if h_path_sprite:
-             for c in range(self.grid_width):
-                 # Avoid overwriting the pond placement logic (crude check)
-                 if self.tile_map[h_path_row][c] is None or self.tile_map[h_path_row][c].startswith('grass_'):
-                    self.tile_map[h_path_row][c] = h_path_sprite
-
-        if v_path_sprite:
-            for r in range(self.grid_height):
-                # Avoid overwriting the pond and horizontal path
-                if self.tile_map[r][v_path_col] is None or self.tile_map[r][v_path_col].startswith('grass_'):
-                    self.tile_map[r][v_path_col] = v_path_sprite
-            # Note: Intersection tile logic could be added here if needed.
+        # 3. Generate twisting paths
+        self._generate_twisting_paths(num_paths=3, max_steps=100) # Example parameters
 
         # 4. Add random props
         num_props = 50
@@ -237,6 +221,176 @@ class City:
                    (tile.startswith('prop_') and (r_offset > 0 or c_offset > 0)):
                     return False
         return True
+
+
+    def _generate_twisting_paths(self, num_paths=1, max_steps=50):
+        """Generates twisting paths using a random walk algorithm."""
+        print(f"Generating {num_paths} twisting paths (max steps: {max_steps})...")
+        path_tiles = set() # Keep track of coordinates that are part of any path
+
+        for path_idx in range(num_paths):
+            # --- Choose Starting Point ---
+            # Start near an edge, avoiding corners initially
+            start_r, start_c = -1, -1
+            attempts = 0
+            while attempts < 20: # Try finding a non-path start point
+                edge = random.choice(['top', 'bottom', 'left', 'right'])
+                if edge == 'top':
+                    start_r, start_c = 0, random.randint(1, self.grid_width - 2)
+                elif edge == 'bottom':
+                    start_r, start_c = self.grid_height - 1, random.randint(1, self.grid_width - 2)
+                elif edge == 'left':
+                    start_r, start_c = random.randint(1, self.grid_height - 2), 0
+                else: # right
+                    start_r, start_c = random.randint(1, self.grid_height - 2), self.grid_width - 1
+
+                # Ensure start is not water/prop and not already a path
+                if self._is_placement_valid(start_r, start_c, 1, 1) and (start_r, start_c) not in path_tiles:
+                     break
+                attempts += 1
+            
+            if attempts == 20:
+                print(f"Path {path_idx+1}: Could not find valid starting point after {attempts} attempts. Skipping.")
+                continue # Skip this path if no valid start found
+
+            print(f"Path {path_idx+1}: Starting at ({start_c}, {start_r})")
+            
+            curr_r, curr_c = start_r, start_c
+            prev_r, prev_c = -1, -1 # No previous tile initially
+            path_tiles.add((curr_r, curr_c))
+            # Initial tile is an end piece (determined later by first step)
+
+            # --- Random Walk ---
+            for step in range(max_steps):
+                possible_next_steps = []
+                # N, S, E, W directions (dr, dc)
+                for dr, dc in [(-1, 0), (1, 0), (0, 1), (0, -1)]:
+                    next_r, next_c = curr_r + dr, curr_c + dc
+
+                    # Check bounds
+                    if not (0 <= next_r < self.grid_height and 0 <= next_c < self.grid_width):
+                        continue
+
+                    # Check if it's the previous tile (avoid immediate U-turn)
+                    if next_r == prev_r and next_c == prev_c:
+                        continue
+
+                    # Check if tile is valid for path (grass or existing path)
+                    tile_content = self.tile_map[next_r][next_c]
+                    is_grass = tile_content and tile_content.startswith('grass_')
+                    is_existing_path = (next_r, next_c) in path_tiles
+                    if not (is_grass or is_existing_path):
+                         # Allow placing paths only on grass or existing paths
+                         # Avoid water, props, None (covered tiles)
+                         continue
+
+                    # Add valid step (with bias: prefer straight/turn over existing path)
+                    weight = 1.0 if is_grass else 0.3 # Lower weight for joining existing paths
+                    # Add slight bias for continuing straight if possible
+                    if prev_r != -1: # Check if not the first step
+                        if curr_r + (curr_r - prev_r) == next_r and curr_c + (curr_c - prev_c) == next_c:
+                            weight *= 1.5 # Favor going straight
+                    
+                    possible_next_steps.append(((next_r, next_c), weight))
+
+                if not possible_next_steps:
+                    print(f"Path {path_idx+1}: Walker stuck at ({curr_c}, {curr_r}) after {step} steps.")
+                    break # Walker is stuck
+
+                # --- Choose Next Step (Weighted Random) ---
+                steps, weights = zip(*possible_next_steps)
+                chosen_next_r, chosen_next_c = random.choices(steps, weights=weights, k=1)[0]
+                print(f"  Step {step+1}: Moving from ({curr_c},{curr_r}) to ({chosen_next_c},{chosen_next_r})")
+
+                # --- Update Tile Sprites ---
+                # Update the *current* tile based on new connection
+                self.tile_map[curr_r][curr_c] = self._get_path_sprite_name(curr_r, curr_c, path_tiles, (chosen_next_r, chosen_next_c))
+                path_tiles.add((curr_r, curr_c)) # Ensure it's marked as path
+
+                # Update the *previous* tile if it exists (its connections might have changed)
+                if prev_r != -1:
+                     self.tile_map[prev_r][prev_c] = self._get_path_sprite_name(prev_r, prev_c, path_tiles)
+                
+                # Set the new current tile (initially as an end pointing back)
+                # This will be corrected in the next iteration or at the end
+                self.tile_map[chosen_next_r][chosen_next_c] = self._get_path_sprite_name(chosen_next_r, chosen_next_c, path_tiles, (curr_r, curr_c))
+                path_tiles.add((chosen_next_r, chosen_next_c))
+
+                # Move walker
+                prev_r, prev_c = curr_r, curr_c
+                curr_r, curr_c = chosen_next_r, chosen_next_c
+
+            # --- Finalize Last Tile ---
+            # After loop ends (stuck or max_steps), update the last tile placed
+            self.tile_map[curr_r][curr_c] = self._get_path_sprite_name(curr_r, curr_c, path_tiles)
+            # Also update the second-to-last tile
+            if prev_r != -1:
+                 self.tile_map[prev_r][prev_c] = self._get_path_sprite_name(prev_r, prev_c, path_tiles)
+            print(f"Path {path_idx+1}: Finished.")
+
+        print("Finished generating all paths.")
+
+
+    def _get_path_sprite_name(self, r, c, path_tiles, next_connection=None):
+        """Determines the correct path sprite name based on neighboring path tiles."""
+        
+        # Check neighbors (N, S, E, W)
+        neighbors = {
+            'N': (r - 1, c),
+            'S': (r + 1, c),
+            'E': (r, c + 1),
+            'W': (r, c - 1)
+        }
+        
+        connected = {'N': False, 'S': False, 'E': False, 'W': False}
+        
+        # Check existing path tiles
+        for direction, (nr, nc) in neighbors.items():
+            if (nr, nc) in path_tiles:
+                connected[direction] = True
+                
+        # Include the immediate next step if provided (ensures connection during walk)
+        if next_connection:
+             for direction, (nr, nc) in neighbors.items():
+                 if (nr, nc) == next_connection:
+                     connected[direction] = True
+                     break # Found the explicit connection
+
+        # Determine sprite based on connections (using dirt path placeholders)
+        n, s, e, w = connected['N'], connected['S'], connected['E'], connected['W']
+        num_connections = sum(connected.values())
+
+        # Default to grass if somehow isolated (shouldn't happen in walk)
+        sprite_name = random.choice(self.grass_sprite_definitions)['name'] if self.grass_sprite_definitions else 'grass_plain_1'
+
+        if num_connections == 1:
+            if n: sprite_name = 'path_dirt_v_end' # End pointing South
+            elif s: sprite_name = 'path_dirt_v_end' # End pointing North (use same sprite, visual rotation needed later)
+            elif e: sprite_name = 'path_dirt_h_end' # End pointing West
+            elif w: sprite_name = 'path_dirt_h_end' # End pointing East
+        elif num_connections == 2:
+            if n and s: sprite_name = 'path_dirt_v_straight'
+            elif e and w: sprite_name = 'path_dirt_h_straight'
+            elif n and e: sprite_name = 'path_dirt_corner_ne'
+            elif n and w: sprite_name = 'path_dirt_corner_nw'
+            elif s and e: sprite_name = 'path_dirt_corner_se'
+            elif s and w: sprite_name = 'path_dirt_corner_sw'
+        elif num_connections == 3:
+            if n and s and e: sprite_name = 'path_dirt_t_nse'
+            elif n and s and w: sprite_name = 'path_dirt_t_nsw'
+            elif n and e and w: sprite_name = 'path_dirt_t_new'
+            elif s and e and w: sprite_name = 'path_dirt_t_sew'
+        elif num_connections == 4:
+            sprite_name = 'path_dirt_cross_nsew'
+        # else num_connections == 0: use default grass
+
+        # Ensure the chosen sprite exists in our lookup
+        if sprite_name not in self.sprite_lookup:
+             print(f"Warning: Calculated path sprite '{sprite_name}' not found in lookup. Falling back to default grass.")
+             sprite_name = random.choice(self.grass_sprite_definitions)['name'] if self.grass_sprite_definitions else 'grass_plain_1'
+
+        # print(f"  Sprite for ({c},{r}): N={n}, S={s}, E={e}, W={w} -> {sprite_name}") # Debugging sprite choice
+        return sprite_name
 
 
     def city_update(self, dt):
