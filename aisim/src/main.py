@@ -120,6 +120,10 @@ def main():
                 elif event.key in time_scales: # Change speed
                      time_scale = time_scales[event.key]
                      print(f"Time scale set to: {time_scale}x")
+                # ADDED: Manual weather change trigger
+                elif event.key == pygame.K_w:
+                    print("W key pressed - forcing next weather state.")
+                    weather.force_next_weather() # Call the new method
             # --- Mouse Button Down Logic (Refactored for GUI) ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
                  if event.button == 1: # Left click

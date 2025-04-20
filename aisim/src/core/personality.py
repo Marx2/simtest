@@ -166,8 +166,4 @@ def _generate_personality(attributes_data: Dict, personality_config: Dict) -> Di
 
     return personality
 
-# Note: _format_personality_for_prompt removed as it was unused here.
-# The OllamaClient uses its own internal formatting method.
 
-# Note: load_or_generate_personality_for_sim and save_personality use 'self'
-# and ideally belong within the Sim class definition in sim.py.
